@@ -537,6 +537,42 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .rxrow span{display:block;font-size:13.5px;color:var(--ink-2);line-height:1.35;margin-top:2px}
 #stars .dc .in{font-size:18px}
 
+/* color pass */
+.tl.tint{background:color-mix(in srgb,var(--ac) 14%,var(--card));box-shadow:inset 0 3px 0 var(--ac)}
+.tl.tint .k{display:flex;align-items:center;gap:6px}
+.tl.tint .k::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--ac);flex:none}
+.tl.tint .bar2{background:color-mix(in srgb,var(--ac) 18%,var(--card))}
+.tl.tint .bar2 i{background:var(--ac)}
+.tl.tint .ringv circle:last-of-type{stroke:var(--ac)!important}
+.tl.tint .dial path{stroke:var(--ac)!important}
+.tl.tint .spark i{background:var(--ac)}
+.sunt{background:linear-gradient(180deg,color-mix(in srgb,var(--sun) 20%,var(--card)),color-mix(in srgb,#f0923a 10%,var(--card)))}
+.hc .hv span{display:inline-block;padding:1px 6px;border-radius:8px;background:color-mix(in srgb,var(--tc) 30%,transparent);box-shadow:inset 0 -3px 0 var(--tc)}
+.hc.lab .hv span{background:none;box-shadow:none}
+.endp{background:linear-gradient(135deg,color-mix(in srgb,var(--tc) 26%,var(--page)),color-mix(in srgb,var(--tc) 8%,var(--page)));box-shadow:inset 4px 0 0 var(--tc)}
+.range .bar{height:8px;top:3px}
+.daycurve .cv{font-size:14px}
+.card>h2{display:flex;align-items:center;gap:8px}
+.card>h2::before{content:"";width:12px;height:12px;border-radius:4px;background:var(--hd,var(--neutral));flex:none}
+#hours>h2{--hd:linear-gradient(135deg,#3aa0e0,#f0923a)}
+#plan>h2{--hd:#4fb35c}
+#week>h2{--hd:linear-gradient(135deg,#2fb5b5,#e5bd34)}
+#dates>h2{--hd:var(--sun)}
+#fact>h2{--hd:#8a7fd0}
+#mountains>h2{--hd:var(--snow)}
+#ahead>h2{--hd:#4a6fd8}
+#history>h2{--hd:var(--temp)}
+#stars>h2{--hd:linear-gradient(135deg,#6a4fd0,#d04f9a)}
+.dc{box-shadow:inset 0 3px 0 var(--sun)}
+#stars .dc{box-shadow:inset 0 3px 0 #8a7fd0}
+.star-top{background:linear-gradient(135deg,#2a2462,#5a3c8f 55%,#9a4c8a);color:#fff}
+.star-top span{color:rgba(255,255,255,.85)}
+.rate .dots i.on{background:linear-gradient(135deg,#6a4fd0,#d04f9a)}
+.leanrow div:first-child{box-shadow:inset 4px 0 0 var(--good)}
+.leanrow div:last-child{box-shadow:inset 4px 0 0 var(--serious)}
+.mc{box-shadow:inset 0 3px 0 var(--snow)}
+.wear-top,.gear .g{background:color-mix(in srgb,#4fb35c 10%,var(--page))}
+
 </style>
 </head>
 <body>
@@ -2104,9 +2140,18 @@ function skyRGB(alt) {
 
 // ---------- small pictures ----------
 let _uid = 0;
+// Temperature as color: deep blue for frigid, teal for cool, green for mild, gold, orange and red for hot.
+const TSCALE = [[10, [91, 91, 214]], [25, [63, 127, 224]], [35, [58, 160, 224]], [45, [47, 181, 181]], [55, [108, 192, 106]], [65, [229, 189, 52]], [75, [240, 146, 58]], [85, [232, 96, 58]], [100, [214, 61, 74]]];
+function tempColor(f) {
+  if (!isNum(f)) return 'var(--neutral)';
+  if (f <= TSCALE[0][0]) return 'rgb(' + TSCALE[0][1].join(',') + ')';
+  for (let i = 1; i < TSCALE.length; i++) if (f <= TSCALE[i][0]) { const a = TSCALE[i - 1], b = TSCALE[i], k = (f - a[0]) / (b[0] - a[0]); return 'rgb(' + a[1].map((v, j) => Math.round(v + (b[1][j] - v) * k)).join(',') + ')'; }
+  return 'rgb(' + TSCALE[TSCALE.length - 1][1].join(',') + ')';
+}
+const tcC = c => tempColor(cToF(c));
 function T(k, v, o) {
   o = o || {};
-  return h('div', { class: 'tl' + (o.wide ? ' wide' : '') + (o.side ? ' side' : '') }, h('div', { class: 'k' }, k), h('div', { class: 'v' }, v, o.unit ? h('small', null, o.unit) : null), o.g ? h('div', { class: 'g' }, o.g) : null, o.n ? h('div', { class: 'n' }, o.n) : null);
+  return h('div', { class: 'tl' + (o.wide ? ' wide' : '') + (o.side ? ' side' : '') + (o.c ? ' tint' : ''), style: o.c ? '--ac:' + o.c : null }, h('div', { class: 'k' }, k), h('div', { class: 'v' }, v, o.unit ? h('small', null, o.unit) : null), o.g ? h('div', { class: 'g' }, o.g) : null, o.n ? h('div', { class: 'n' }, o.n) : null);
 }
 const bar2 = (frac, color) => h('div', { class: 'bar2' }, h('i', { style: 'width:' + rnd(clamp(frac, 0, 1) * 100, 1) + '%' + (color ? ';background:' + color : '') }));
 function pinScale(val, max, segs, label) {
@@ -2225,10 +2270,12 @@ function dayCurve(wx, p, now) {
   const X = k => 8 + k / 24 * (W - 16), Y = t => 20 + (hi - t) / Math.max(1, hi - lo) * 40;
   const pts = v.map((t, k) => rnd(X(k), 1) + ' ' + rnd(Y(t), 1)), kNow = clamp((now - H.t[a]) / HOUR, 0, v.length - 1), f = kNow - Math.floor(kNow);
   const tNow = v[Math.floor(kNow)] + ((v[Math.min(v.length - 1, Math.floor(kNow) + 1)] - v[Math.floor(kNow)]) * f);
+  const gid = 'dc' + (++_uid), stops = v.map((t, k) => s('stop', { offset: rnd(k / (v.length - 1) * 100, 1) + '%', 'stop-color': tempColor(t) }));
   const kHi = v.indexOf(hi), kLo = v.indexOf(lo), lab = (k, t, up) => s('text', { x: clamp(X(k), 16, W - 16), y: up ? Y(t) - 8 : Y(t) + 16, 'text-anchor': 'middle', class: 'cv' }, Math.round(t) + '°');
   return s('svg', { viewBox: '0 0 ' + W + ' ' + Ht, class: 'daycurve', role: 'img', 'aria-label': 'Today’s temperature from midnight to midnight: low ' + Math.round(lo) + ', high ' + Math.round(hi) },
-    s('path', { d: 'M' + pts.join('L') + 'L' + rnd(X(v.length - 1), 1) + ' 72L' + X(0) + ' 72Z', style: 'fill:currentColor;opacity:.1' }),
-    s('path', { d: 'M' + pts.join('L'), fill: 'none', style: 'stroke:currentColor', 'stroke-width': 2.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
+    s('linearGradient', { id: gid, x1: 0, x2: 1, y1: 0, y2: 0 }, stops),
+    s('path', { d: 'M' + pts.join('L') + 'L' + rnd(X(v.length - 1), 1) + ' 72L' + X(0) + ' 72Z', style: 'fill:url(#' + gid + ');opacity:.32' }),
+    s('path', { d: 'M' + pts.join('L'), fill: 'none', style: 'stroke:url(#' + gid + ')', 'stroke-width': 4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
     lab(kHi, hi, true), lab(kLo, lo, false),
     s('circle', { cx: rnd(X(kNow), 1), cy: rnd(Y(tNow), 1), r: 5.5, style: 'fill:currentColor' }),
     [[0, '12 AM', 'start'], [6, '6 AM', 'middle'], [12, 'Noon', 'middle'], [18, '6 PM', 'middle'], [24, '12 AM', 'end']].map(q => s('text', { x: X(q[0]), y: 90, 'text-anchor': q[2], class: 'cx' }, q[1])));
@@ -2285,8 +2332,8 @@ R.brief = function () {
 // ---------- hourly strip ----------
 function hourCol(H, i, label, cls) {
   const pp = H.pp[i];
-  return h('div', { class: 'hc ' + (cls || '') + (H.isDay[i] === 0 ? ' nt' : '') }, h('div', { class: 'ht' }, label), icon(iconKind(H.code[i], H.isDay[i])),
-    h('div', { class: 'hv' }, fT(H.temp[i])), h('div', { class: 'hf' }, fT(H.app[i])),
+  return h('div', { class: 'hc ' + (cls || '') + (H.isDay[i] === 0 ? ' nt' : ''), style: '--tc:' + tcC(H.temp[i]) }, h('div', { class: 'ht' }, label), icon(iconKind(H.code[i], H.isDay[i])),
+    h('div', { class: 'hv' }, h('span', null, fT(H.temp[i]))), h('div', { class: 'hf' }, fT(H.app[i])),
     h('div', { class: 'hp' + (isNum(pp) && pp >= 30 ? ' wet' : '') }, isNum(pp) && pp >= 10 ? [dropSvg(), Math.round(pp) + '%'] : '–'),
     h('div', { class: 'hw' }, arrow(H.wdir[i]), fMph(H.wind[i])));
 }
@@ -2354,7 +2401,7 @@ function renderPlanOut() {
   const mid = Math.ceil(idx.length / 2), h1 = Math.round(meanOf(idx.slice(0, mid).map(F))), h2 = Math.round(meanOf(idx.slice(mid).map(F)));
   let head = d >= 4 ? 'Warms up ' + d + '° while you are out.' : d <= -4 ? 'Cools off ' + Math.abs(d) + '° while you are out.' : 'Holds steady, feeling like about ' + Math.round((fa + fb) / 2) + '°.';
   if (golf && idx.length > 2 && Math.abs(h2 - h1) >= 4) head += ' The back nine feels ' + Math.abs(h2 - h1) + '° ' + (h2 > h1 ? 'warmer' : 'cooler') + ' than the front.';
-  const end = (label, i, t) => h('div', { class: 'endp' }, h('div', { class: 'k' }, label + ', ' + fTime(t, tz)), h('div', { class: 'v' }, fT(H.temp[i]), icon(iconKind(H.code[i], H.isDay[i]))), h('div', { class: 'n' }, 'Feels like ' + Math.round(F(i)) + '°'));
+  const end = (label, i, t) => h('div', { class: 'endp', style: '--tc:' + tempColor(F(i)) }, h('div', { class: 'k' }, label + ', ' + fTime(t, tz)), h('div', { class: 'v' }, fT(H.temp[i]), icon(iconKind(H.code[i], H.isDay[i]))), h('div', { class: 'n' }, 'Feels like ' + Math.round(F(i)) + '°'));
   // what changes along the way, stated as facts
   const notes = [], at = i => fHour(H.t[i], tz);
   const wetI = idx.find(i => isNum(H.pp[i]) && H.pp[i] >= 50), ppMax = maxOf(idx.map(i => H.pp[i])), ppI = idx.find(i => H.pp[i] === ppMax);
@@ -2400,7 +2447,7 @@ R.week = function () {
   const rows = ids.map((i, k) => {
     const t = D.t[i] + 12 * HOUR, n = normal(i), pp = D.ppmax[i];
     const range = h('div', { class: 'range', title: 'Low ' + fT(D.tmin[i]) + ', high ' + fT(D.tmax[i]) }, h('i', { class: 'track' }),
-      h('i', { class: 'bar', style: 'left:' + rnd(pos(D.tmin[i]), 1) + '%;width:max(8px,' + rnd(pos(D.tmax[i]) - pos(D.tmin[i]), 1) + '%)' }),
+      h('i', { class: 'bar', style: 'left:' + rnd(pos(D.tmin[i]), 1) + '%;width:max(8px,' + rnd(pos(D.tmax[i]) - pos(D.tmin[i]), 1) + '%);background:linear-gradient(90deg,' + tcC(D.tmin[i]) + ',' + tcC(D.tmax[i]) + ')' }),
       n && isNum(n.hi) && n.hi >= lo && n.hi <= hi ? h('i', { class: 'tick', title: 'Average high for the date, ' + fT(n.hi), style: 'left:calc(' + rnd(pos(n.hi), 1) + '% - 1px)' }) : null,
       k === 0 && wx.cur && isNum(wx.cur.temp) ? h('i', { class: 'nowdot', title: 'Now', style: 'left:clamp(6px,' + rnd(pos(wx.cur.temp), 1) + '%,calc(100% - 6px))' }) : null);
     return h('div', { class: 'wk-row' }, h('div', { class: 'day' }, k === 0 ? 'Today' : fDow(t, tz)), icon(iconKind(D.code[i], 1)),
@@ -2420,12 +2467,12 @@ R.now = function () {
   const c = wx.cur, H = wx.h, hI = hourIdx(H.t, now);
   const tF = cToF(c.temp), aF = cToF(c.app), mph = kmh2mph(c.wind), gust = kmh2mph(c.gust), dewF = cToF(c.dew);
   const wc = windChillF(tF, mph), t = [], x = [];
-  if (isNum(aF)) { const d = Math.round(aF) - Math.round(tF); t.push(T('Feels like', Math.round(aF) + '°', { n: d === 0 ? 'Same as the thermometer.' : d < 0 ? (wc != null && tF - wc >= 1.5 ? 'Wind takes off ' + Math.abs(d) + '°.' : Math.abs(d) + '° colder than the reading.') : (c.isDay && c.cloud < 60 ? 'Sun adds ' + d + '°.' : d + '° warmer than the reading.') })); }
-  t.push(T('Wind', isNum(mph) ? Math.round(mph) : '–', { unit: 'mph', side: true, g: dial(c.wdir), n: (isNum(gust) ? 'Gusts ' + Math.round(gust) + '. ' : '') + 'From the ' + compass(c.wdir) + '.' }));
-  if (hI >= 0) { const next = H.pp.slice(hI, hI + 12); t.push(T('Rain, next 12 hours', isNum(H.pp[hI]) ? Math.round(H.pp[hI]) + '%' : '–', { g: h('div', { class: 'spark', role: 'img', 'aria-label': 'Chance of rain for each of the next 12 hours' }, next.map(v => h('i', { style: 'height:' + Math.max(4, isNum(v) ? v : 0) + '%' }))), n: rainLine(wx, hI, now, tz) + '.' })); }
-  if (isNum(c.uv)) t.push(T('UV index', rnd(c.uv, 0), { unit: uvWord(c.uv), g: pinScale(c.uv, 12, UV_SEGS, 'UV index ' + rnd(c.uv, 0) + ' of 11 and up'), n: c.uv >= 3 ? 'Sunscreen.' : 'No protection needed.' }));
-  t.push(T('Humidity', fPct(c.rh), { g: bar2((c.rh || 0) / 100), n: isNum(dewF) ? 'Dew point ' + Math.round(dewF) + '°, ' + dewWord(dewF) + '.' : '' }));
-  if (isNum(c.cloud)) x.push(T('Cloud cover', fPct(c.cloud), { g: bar2(c.cloud / 100), n: c.isDay ? (c.cloud < 30 ? 'Warmer in the sun than the shade.' : c.cloud < 70 ? 'Sun in and out.' : 'Sun and shade feel the same.') : (c.cloud < 30 ? 'Clear nights cool fastest.' : 'Cloud holds the warmth in.') }));
+  if (isNum(aF)) { const d = Math.round(aF) - Math.round(tF); t.push(T('Feels like', Math.round(aF) + '°', { c: tempColor(aF), n: d === 0 ? 'Same as the thermometer.' : d < 0 ? (wc != null && tF - wc >= 1.5 ? 'Wind takes off ' + Math.abs(d) + '°.' : Math.abs(d) + '° colder than the reading.') : (c.isDay && c.cloud < 60 ? 'Sun adds ' + d + '°.' : d + '° warmer than the reading.') })); }
+  t.push(T('Wind', isNum(mph) ? Math.round(mph) : '–', { c: '#1f9e9a', unit: 'mph', side: true, g: dial(c.wdir), n: (isNum(gust) ? 'Gusts ' + Math.round(gust) + '. ' : '') + 'From the ' + compass(c.wdir) + '.' }));
+  if (hI >= 0) { const next = H.pp.slice(hI, hI + 12); t.push(T('Rain, next 12 hours', isNum(H.pp[hI]) ? Math.round(H.pp[hI]) + '%' : '–', { c: 'var(--rain)', g: h('div', { class: 'spark', role: 'img', 'aria-label': 'Chance of rain for each of the next 12 hours' }, next.map(v => h('i', { style: 'height:' + Math.max(4, isNum(v) ? v : 0) + '%' }))), n: rainLine(wx, hI, now, tz) + '.' })); }
+  if (isNum(c.uv)) t.push(T('UV index', rnd(c.uv, 0), { c: c.uv < 3 ? 'var(--good)' : c.uv < 6 ? 'var(--warn)' : c.uv < 8 ? 'var(--serious)' : 'var(--crit)', unit: uvWord(c.uv), g: pinScale(c.uv, 12, UV_SEGS, 'UV index ' + rnd(c.uv, 0) + ' of 11 and up'), n: c.uv >= 3 ? 'Sunscreen.' : 'No protection needed.' }));
+  t.push(T('Humidity', fPct(c.rh), { c: '#2fa7c9', g: bar2((c.rh || 0) / 100), n: isNum(dewF) ? 'Dew point ' + Math.round(dewF) + '°, ' + dewWord(dewF) + '.' : '' }));
+  if (isNum(c.cloud)) x.push(T('Cloud cover', fPct(c.cloud), { c: 'var(--neutral)', g: bar2(c.cloud / 100), n: c.isDay ? (c.cloud < 30 ? 'Warmer in the sun than the shade.' : c.cloud < 70 ? 'Sun in and out.' : 'Sun and shade feel the same.') : (c.cloud < 30 ? 'Clear nights cool fastest.' : 'Cloud holds the warmth in.') }));
   const pt = hI >= 3 ? pressureTrend(wx, hI) : null;
   if (isNum(c.pmsl)) x.push(T('Pressure', hpa2inhg(c.pmsl).toFixed(2), { unit: 'inHg', side: true, g: pt ? trendSvg(pt.d >= 0.5 ? 1 : pt.d <= -0.5 ? -1 : 0) : null, n: pt ? pt.word + '. ' + (pt.d >= 0.5 ? 'Clearing.' : pt.d <= -0.5 ? 'Weather on the way.' : 'No change coming.') : '' }));
   if (isNum(c.vis)) { const mi = m2mi(c.vis); x.push(T('Visibility', mi >= 10 ? '10+' : rnd(mi, mi < 3 ? 1 : 0), { unit: 'mi', n: mi < 0.3 ? 'Dense fog.' : mi < 1 ? 'Fog.' : mi < 4 ? 'Mist or haze.' : 'Clear air.' })); }
@@ -2446,7 +2493,7 @@ R.air = function () {
   const c = aq.cur, cat = aqiCat(c.aqi), H = aq.h, i0 = Math.max(0, hourIdx(H.t, now));
   const sub = [['Fine particles (PM2.5)', c.pm25, H.aPm25[i0], 'Smoke and exhaust. The one that matters most here.'], ['Coarse particles (PM10)', c.pm10, H.aPm10[i0], 'Dust, road grit and pollen.'], ['Ozone', c.o3, H.aO3[i0], 'Forms in sunlight on hot afternoons.'], ['Nitrogen dioxide', c.no2, H.aNo2[i0], 'Traffic exhaust.'], ['Sulfur dioxide', c.so2, H.aSo2[i0], 'Industry and shipping.'], ['Carbon monoxide', c.co, H.aCo[i0], 'Combustion.']];
   const lead = sub.filter(r => isNum(r[2])).sort((a, b) => b[2] - a[2])[0];
-  fill('air-body', T('Air quality', isNum(c.aqi) ? Math.round(c.aqi) : '–', { unit: cat.name.replace('Unhealthy for sensitive groups', 'Sensitive'), g: pinScale(c.aqi || 0, 300, AQI_SEGS, 'Air quality index ' + Math.round(c.aqi) + ', where 0 to 50 is good'), n: lead ? 'Mostly ' + lead[0].replace(/ \(.*/, '').toLowerCase() + '.' : '' }));
+  fill('air-body', T('Air quality', isNum(c.aqi) ? Math.round(c.aqi) : '–', { c: !isNum(c.aqi) || c.aqi <= 50 ? 'var(--good)' : c.aqi <= 100 ? 'var(--warn)' : c.aqi <= 150 ? 'var(--serious)' : 'var(--crit)', unit: cat.name.replace('Unhealthy for sensitive groups', 'Sensitive'), g: pinScale(c.aqi || 0, 300, AQI_SEGS, 'Air quality index ' + Math.round(c.aqi) + ', where 0 to 50 is good'), n: lead ? 'Mostly ' + lead[0].replace(/ \(.*/, '').toLowerCase() + '.' : '' }));
   const draw = host => {
     const cHost = h('div');
     fill(host, h('p', { class: 'sub' }, cat.advice), h('div', { class: 'pols' }, sub.map(r => h('div', { class: 'pol' }, h('div', { class: 'pol-h' }, h('b', null, r[0]), h('span', null, isNum(r[1]) ? rnd(r[1], r[1] < 10 ? 1 : 0) + ' µg/m³' : '–'), h('span', null, 'index ' + (isNum(r[2]) ? Math.round(r[2]) : '–'))), h('div', { class: 'pol-d' }, r[3])))),
@@ -2469,18 +2516,18 @@ R.light = function () {
   const hasSun = !!(sd.sunrise && sd.sunset);
   const yt = yearTable(p, z.y), doy = dayOfYear(z.y, z.m, z.d), diy = daysInYear(z.y);
   if (hasSun) {
-    t.push(h('div', { class: 'tl wide' }, h('div', { class: 'k' }, 'Sun'), h('div', { class: 'g' }, sunArc(p, now)),
+    t.push(h('div', { class: 'tl wide tint sunt', style: '--ac:var(--sun)' }, h('div', { class: 'k' }, 'Sun'), h('div', { class: 'g' }, sunArc(p, now)),
       h('div', { class: 'arc-times' }, h('div', null, 'Sunrise', h('br'), h('b', null, fTime(sd.sunrise, tz))), h('div', { style: 'text-align:center' }, 'First and last light', h('br'), h('b', null, fTime(sd.dawn, tz).replace(/ [AP]M/, '') + ' and ' + fTime(sd.dusk, tz).replace(/ [AP]M/, ''))), h('div', null, 'Sunset', h('br'), h('b', null, fTime(sd.sunset, tz))))));
     const d1 = y1.len ? sd.len - y1.len : 0;
-    t.push(T('Daylight', fDur(sd.len), { g: yearCurve(yt.map(d => d.len), doy - 1, 'var(--sun)'), n: fDurS(d1) + (d1 < 0 ? ' less' : ' more') + ' than yesterday.' }));
+    t.push(T('Daylight', fDur(sd.len), { c: 'var(--sun)', g: yearCurve(yt.map(d => d.len), doy - 1, 'var(--sun)'), n: fDurS(d1) + (d1 < 0 ? ' less' : ' more') + ' than yesterday.' }));
     const sol = SEASON_EVENTS.find(e => e.t > now && (e.k === 'dec' || e.k === 'jun')), s2 = sol ? sunAt(p, sol.t) : null;
-    if (s2 && s2.len) { const shortest = s2.len < sd.len; t.push(T(shortest ? 'Shortest day' : 'Longest day', String(Math.max(0, daysBetween(now, sol.t, tz))), { unit: 'days', n: fMD(sol.t, tz) + ', ' + fDur(s2.len) + '. ' + fDurLoose(Math.abs(sd.len - s2.len)) + ' still to ' + (shortest ? 'lose.' : 'gain.') })); }
+    if (s2 && s2.len) { const shortest = s2.len < sd.len; t.push(T(shortest ? 'Shortest day' : 'Longest day', String(Math.max(0, daysBetween(now, sol.t, tz))), { c: shortest ? '#5b6fd6' : 'var(--sun)', unit: 'days', n: fMD(sol.t, tz) + ', ' + fDur(s2.len) + '. ' + fDurLoose(Math.abs(sd.len - s2.len)) + ' still to ' + (shortest ? 'lose.' : 'gain.') })); }
   } else t.push(T('Sun', '–', { wide: true, n: 'The sun does not rise and set in the usual way here today.' }));
   const mo = S.moon;
-  if (mo) t.push(T('Moon', Math.round(mo.frac * 100) + '%', { side: true, g: moonSvg(mo.frac, mo.waxing, 56), n: mo.name + '.' + (mo.nextFull ? ' Full ' + fMD(mo.nextFull.t, tz) + '.' : '') }));
+  if (mo) t.push(T('Moon', Math.round(mo.frac * 100) + '%', { c: '#8a7fd0', side: true, g: moonSvg(mo.frac, mo.waxing, 56), n: mo.name + '.' + (mo.nextFull ? ' Full ' + fMD(mo.nextFull.t, tz) + '.' : '') }));
   const sea = seasonInfo(now, p.lat);
-  if (sea) t.push(T('Season', sea.name, { side: true, g: ring(sea.frac, Math.round(sea.frac * 100) + '%'), n: plural(Math.max(0, Math.round((sea.end - now) / DAY)), 'day') + ' until ' + sea.next.toLowerCase() + '.' }));
-  t.push(T(String(z.y), 'Day ' + doy + ' of ' + diy, { wide: true, g: bar2(doy / diy), n: plural(diy - doy, 'day') + ' left, ' + Math.round(doy / diy * 100) + '% done.' }));
+  if (sea) t.push(T('Season', sea.name, { c: /Autumn|Fall/.test(sea.name) ? '#e07a2e' : /Winter/.test(sea.name) ? '#4a8fd8' : /Spring/.test(sea.name) ? '#4fb35c' : '#e5a823', side: true, g: ring(sea.frac, Math.round(sea.frac * 100) + '%'), n: plural(Math.max(0, Math.round((sea.end - now) / DAY)), 'day') + ' until ' + sea.next.toLowerCase() + '.' }));
+  t.push(T(String(z.y), 'Day ' + doy + ' of ' + diy, { c: '#4fb35c', wide: true, g: bar2(doy / diy), n: plural(diy - doy, 'day') + ' left, ' + Math.round(doy / diy * 100) + '% done.' }));
   fill('light-body', t);
   // dates coming up
   const ms = (S.ms || []).slice(0, 8), cards = ms.map(e => { const n = daysBetween(now, e.t, tz); return h('div', { class: 'dc', title: e.detail || '' }, h('div', { class: 'in' }, n <= 0 ? 'Today' : n + (n === 1 ? ' day' : ' days')), h('div', { class: 'lb' }, e.label), h('div', { class: 'dt' }, fDowMD(e.t, tz))); });
