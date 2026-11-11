@@ -573,6 +573,45 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .mc{box-shadow:inset 0 3px 0 var(--snow)}
 .wear-top,.gear .g{background:color-mix(in srgb,#4fb35c 10%,var(--page))}
 
+/* collapsible rows */
+.xrows{margin-top:4px}
+.xr{border-top:1px solid var(--hair)}
+.xrows .xr:first-child,.xrows .contents:first-child>.contents>.xr:first-child{border-top:0}
+.xr summary{display:grid;grid-template-columns:10px minmax(0,1fr) auto 12px;align-items:center;column-gap:12px;padding:11px 0;cursor:pointer;list-style:none;-webkit-tap-highlight-color:transparent}
+.xr summary::-webkit-details-marker{display:none}
+.xr summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s}
+.xr[open] summary::after{transform:rotate(225deg) translate(-2px,-2px)}
+.xd{width:10px;height:10px;border-radius:50%;background:var(--ac)}
+.xk{min-width:0;display:flex;flex-direction:column;gap:1px}
+.xk b{font-size:15.5px;font-weight:700;line-height:1.2}
+.xk span{font-size:13px;color:var(--ink-2);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xr[open] .xk span{white-space:normal}
+.xv{font-size:22px;font-weight:780;font-variant-numeric:tabular-nums;font-stretch:104%;letter-spacing:-.01em;white-space:nowrap;text-align:right}
+.xv small{font-size:13px;font-weight:650;color:var(--ink-2);margin-left:3px;letter-spacing:0}
+.xb{padding:2px 0 14px 22px;--card:var(--panel)}
+.xb .g{margin:4px 0 8px}
+.xb .g>.bar2,.xb .g>.pscale,.xb .g>.spark{max-width:420px}
+.xb .bar2{background:color-mix(in srgb,var(--ac) 18%,var(--page))}
+.xb .bar2 i,.xb .spark i{background:var(--ac)}
+.xb .ringv circle:last-of-type{stroke:var(--ac)!important}
+.xb .dial path{stroke:var(--ac)!important}
+.xb .dial{width:84px;height:84px}
+.xb .n,.xb .xm{font-size:13.5px;color:var(--ink-2);line-height:1.45;margin:6px 0 0;max-width:60ch}
+.xb .xm{color:var(--muted)}
+.xb .arc{max-width:520px}
+.xb .arc-times{max-width:520px}
+.xb .pols{margin-top:8px}
+.xsep{height:6px;border-top:1px solid var(--hair);margin-top:0}
+.xsep+.xr{border-top:0}
+#conds>h2{--hd:linear-gradient(135deg,#1f9e9a,#2a78d6)}
+#sunsea>h2{--hd:linear-gradient(135deg,#eda100,#8a7fd0)}
+
+.hero-story{display:flex;flex-wrap:wrap;gap:6px;font-size:15px;font-weight:650;max-width:none}
+.hero-story .sc{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.5);border-radius:999px;padding:6px 12px 6px 9px;line-height:1.1;white-space:nowrap}
+.hero.night .hero-story .sc{background:rgba(255,255,255,.14)}
+.hero-story .sc svg{width:17px;height:17px;flex:none}
+@media (min-width:980px){.hero-story{font-size:16px;align-self:end}}
+
 </style>
 </head>
 <body>
@@ -604,15 +643,10 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
       <section class="card" id="week"><h2>The days ahead</h2><div id="week-body"></div></section>
     </div>
     <div class="col">
-      <div class="tiles" id="tiles">
-        <div class="contents" id="now"><div class="contents" id="now-body"></div></div>
-        <div class="contents" id="air"><div class="contents" id="air-body"></div></div>
-        <div class="contents" id="light"><div class="contents" id="light-body"></div></div>
-      </div>
+      <section class="card" id="conds"><h2>Right now</h2><div class="xrows"><div class="contents" id="now"><div class="contents" id="now-body"></div></div><div class="contents" id="air"><div class="contents" id="air-body"></div></div><div class="contents" id="now-x"></div></div></section>
+      <section class="card" id="sunsea"><h2>Sun and season</h2><div class="xrows"><div class="contents" id="light"><div class="contents" id="light-body"></div></div></div></section>
       <section class="card" id="dates"><h2>Coming up</h2><div id="light-more"></div></section>
       <section class="card" id="fact"><h2>Cool to know</h2><div id="fact-body"></div></section>
-      <div class="more" id="now-more"></div>
-      <div class="more" id="air-more"></div>
     </div>
   </div>
   </div>
@@ -2232,33 +2266,48 @@ function rainLine(wx, i0, now, tz) {
 }
 
 // The day in a sentence or two: what the temperature, sky, rain and wind are going to do, stated as facts.
+// The day as a few short chips, each with an icon: where the temperature goes, the sky, rain, wind, and against yesterday.
+const STORY_ICON = {
+  up: 'M12 19V5M12 5l-5 5M12 5l5 5', down: 'M12 5v14M12 19l-5-5M12 19l5-5', flat: 'M4 12h16M20 12l-5-5M20 12l-5 5',
+  sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2',
+  cloud: 'M7 18h10a4 4 0 0 0 .5-8 5.500 5.500 0 0 0-10.700 1.500A3.300 3.300 0 0 0 7 18z',
+  drop: 'M12 3s-6 7-6 11a6 6 0 0 0 12 0c0-4-6-11-6-11z', dry: 'M12 3s-6 7-6 11a6 6 0 0 0 12 0c0-4-6-11-6-11zM5 5l14 14',
+  wind: 'M3 9h10a3 3 0 1 0-3-3M3 14h15a3 3 0 1 1-3 3M3 11.500h6', cal: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4'
+};
+const storyIcon = k => s('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }, s('path', { d: STORY_ICON[k], fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+function whenShort(ms, now, tz) { const r = relDay(ms, now, tz); return (r === 'today' ? '' : r === 'tomorrow' ? 'tomorrow ' : r + ' ') + fHour(ms, tz); }
+function rainShort(wx, i0, now, tz) {
+  const rc = rainChange(wx, i0);
+  if (rc.nowWet) return rc.easesAt ? ['drop', 'Rain eases ' + whenShort(rc.easesAt, now, tz)] : ['drop', 'Rain all day'];
+  return rc.startsAt ? ['drop', 'Rain ' + whenShort(rc.startsAt, now, tz)] : ['dry', 'Dry 36 hrs'];
+}
 function dayStory(wx, p, now, i0) {
   const tz = p.tz, H = wx.h, z = zparts(now, tz), out = [], F = i => Math.round(cToF(H.temp[i]));
   const nx = addDays(z.y, z.m, z.d, 1), endToday = hourIdx(H.t, zonedEpoch(nx[0], nx[1], nx[2], 0, 0, tz) - HOUR);
   const today = []; for (let i = i0; i <= endToday && i < H.t.length; i++) today.push(i);
   const nowF = F(i0);
   if (z.h >= 18 || today.length < 3) {
-    const di = dayIdx(wx, now, tz), night = []; for (let i = i0; i < Math.min(H.t.length, i0 + 14); i++) night.push(i);
+    const night = []; for (let i = i0; i < Math.min(H.t.length, i0 + 14); i++) night.push(i);
     const lowI = night.reduce((b, i) => H.temp[i] < H.temp[b] ? i : b, i0);
-    if (nowF - F(lowI) >= 3) out.push('Drops to ' + F(lowI) + '° by ' + fHour(H.t[lowI], tz) + '.'); else out.push('Holds near ' + nowF + '° overnight.');
-    if (di >= 0 && isNum(wx.d.tmax[di + 1])) out.push('Tomorrow reaches ' + fT(wx.d.tmax[di + 1]) + '.');
+    out.push(nowF - F(lowI) >= 3 ? ['down', '−' + (nowF - F(lowI)) + '° to ' + F(lowI) + '° by ' + fHour(H.t[lowI], tz)] : ['flat', 'Steady near ' + nowF + '°']);
   } else {
     const peakI = today.reduce((b, i) => H.temp[i] > H.temp[b] ? i : b, i0), eveI = today.find(i => zparts(H.t[i], tz).h === 20) || today[today.length - 1];
-    if (peakI > i0 && F(peakI) - nowF >= 3) out.push('Warms ' + (F(peakI) - nowF) + '° to ' + F(peakI) + '° by ' + fHour(H.t[peakI], tz) + '.');
-    else if (nowF - F(eveI) >= 3) out.push('Cools ' + (nowF - F(eveI)) + '° to ' + F(eveI) + '° by ' + fHour(H.t[eveI], tz) + '.');
-    else out.push('Holds near ' + nowF + '° into the evening.');
+    if (peakI > i0 && F(peakI) - nowF >= 3) out.push(['up', '+' + (F(peakI) - nowF) + '° to ' + F(peakI) + '° by ' + fHour(H.t[peakI], tz)]);
+    else if (nowF - F(eveI) >= 3) out.push(['down', '−' + (nowF - F(eveI)) + '° to ' + F(eveI) + '° by ' + fHour(H.t[eveI], tz)]);
+    else out.push(['flat', 'Steady near ' + nowF + '°']);
     const c0 = H.cloud[i0], wetNow = isNum(H.pp[i0]) && H.pp[i0] >= 50;
     if (!wetNow && isNum(c0)) {
       const clearI = today.find(i => i > i0 && H.cloud[i] <= 35 && H.isDay[i] === 1), cloudI = today.find(i => i > i0 && H.cloud[i] >= 70);
-      if (c0 >= 70 && clearI != null) out.push('Clouds break around ' + fHour(H.t[clearI], tz) + '.');
-      else if (c0 <= 35 && cloudI != null) out.push('Clouds move in around ' + fHour(H.t[cloudI], tz) + '.');
+      if (c0 >= 70 && clearI != null) out.push(['sun', 'Clears ' + fHour(H.t[clearI], tz)]);
+      else if (c0 <= 35 && cloudI != null) out.push(['cloud', 'Clouds ' + fHour(H.t[cloudI], tz)]);
     }
   }
-  out.push(rainLine(wx, i0, now, tz) + '.');
-  const gI = today.reduce((b, i) => H.gust[i] > H.gust[b] ? i : b, i0);
-  if (isNum(H.gust[gI]) && kmh2mph(H.gust[gI]) >= 25) out.push('Gusts to ' + fMph(H.gust[gI]) + ' mph around ' + fHour(H.t[gI], tz) + '.');
-  if (i0 >= 24 && isNum(H.temp[i0 - 24])) { const d = nowF - F(i0 - 24); if (Math.abs(d) >= 3) out.push(Math.abs(d) + '° ' + (d > 0 ? 'warmer' : 'colder') + ' than yesterday at this hour.'); }
-  return out.slice(0, 4);
+  out.push(rainShort(wx, i0, now, tz));
+  const span = today.length >= 3 ? today : (() => { const a = []; for (let i = i0; i < Math.min(H.t.length, i0 + 12); i++) a.push(i); return a; })();
+  const gI = span.reduce((b, i) => H.gust[i] > H.gust[b] ? i : b, i0);
+  if (isNum(H.gust[gI]) && kmh2mph(H.gust[gI]) >= 25) out.push(['wind', 'Gusts ' + fMph(H.gust[gI]) + ' mph ' + fHour(H.t[gI], tz)]);
+  if (i0 >= 24 && isNum(H.temp[i0 - 24])) { const d = nowF - F(i0 - 24); if (Math.abs(d) >= 3) out.push(['cal', (d > 0 ? '+' : '−') + Math.abs(d) + '° vs yesterday']); }
+  return out.slice(0, 5);
 }
 // Today's temperature from midnight to midnight, with a dot for now and the high and low marked.
 function dayCurve(wx, p, now) {
@@ -2301,7 +2350,7 @@ R.hero = function () {
     if (isNum(c.app)) side.push(h('span', null, 'Feels like ' + fT(c.app)));
     if (di >= 0) side.push(h('span', null, 'High ' + fT(wx.d.tmax[di]) + '  Low ' + fT(wx.d.tmin[di])));
     fill('hero-main', h('div', { class: 'hero-temp' }, fT(c.temp)), h('div', { class: 'hero-cond' }, icon(iconKind(c.code, c.isDay)), side));
-    fill('hero-story', i0 >= 0 ? dayStory(wx, p, now, i0).map(x => h('span', null, x + ' ')) : null);
+    fill('hero-story', i0 >= 0 ? dayStory(wx, p, now, i0).map(x => h('span', { class: 'sc' }, storyIcon(x[0]), x[1])) : null);
     fill('hero-curve', i0 >= 0 ? dayCurve(wx, p, now) : null);
     if (di >= 0 && isNum(wx.d.tmax[di + 1])) chips.push(chip('Tomorrow ' + fT(wx.d.tmax[di + 1]) + ' / ' + fT(wx.d.tmin[di + 1])));
     if (S.aq && S.aq.cur && isNum(S.aq.cur.aqi) && S.aq.cur.aqi > 50) chips.push(chip('Air: ' + aqiCat(S.aq.cur.aqi).name.toLowerCase(), null, aqiCat(S.aq.cur.aqi).dot));
@@ -2361,7 +2410,7 @@ R.hours = function () {
       tip: k => { const i = ix[k]; return { title: fDow(x[k], tz) + ' ' + fHour(x[k], tz) + ', ' + condText(H.code[i]).toLowerCase(), rows: [{ name: 'Temperature', value: fT(H.temp[i]), color: 'var(--temp)' }, { name: 'Feels like', value: fT(H.app[i]), color: 'var(--feel)' }, { name: 'Chance of rain', value: fPct(H.pp[i]) }, { name: 'Wind, gusts', value: fMph(H.wind[i]) + ', ' + fMph(H.gust[i]) + ' mph' }] }; } });
     chart(c2, { label: 'Chance of rain for the next 24 hours', height: 110, x, xTicks: ticks, yDomain: [0, 100], yTicks: [0, 50, 100], yFmt: v => v + '%', bars: { values: ix.map(i => H.pp[i]), color: 'var(--rain)', labelMax: true, fmt: v => Math.round(v) + '%' }, tip: k => ({ title: fDow(x[k], tz) + ' ' + fHour(x[k], tz), rows: [{ name: 'Chance of rain', value: fPct(H.pp[ix[k]]), color: 'var(--rain)' }] }) });
   };
-  fill('hours-body', h('div', { class: 'headline' }, line), h('div', { class: 'hstrip' }, hourLabels(), cols), lazy('Show as a chart', drawCharts));
+  fill('hours-body', h('div', { class: 'hstrip', style: 'margin-top:4px' }, hourLabels(), cols), lazy('Show as a chart', drawCharts));
 };
 
 // ---------- heading out: the facts for a stretch of time, and how they change ----------
@@ -2399,8 +2448,8 @@ function renderPlanOut() {
   const fa = Math.round(F(ia)), fb = Math.round(F(ib)), d = fb - fa;
   const idx = []; for (let i = ia; i <= ib; i++) idx.push(i);
   const mid = Math.ceil(idx.length / 2), h1 = Math.round(meanOf(idx.slice(0, mid).map(F))), h2 = Math.round(meanOf(idx.slice(mid).map(F)));
-  let head = d >= 4 ? 'Warms up ' + d + '° while you are out.' : d <= -4 ? 'Cools off ' + Math.abs(d) + '° while you are out.' : 'Holds steady, feeling like about ' + Math.round((fa + fb) / 2) + '°.';
-  if (golf && idx.length > 2 && Math.abs(h2 - h1) >= 4) head += ' The back nine feels ' + Math.abs(h2 - h1) + '° ' + (h2 > h1 ? 'warmer' : 'cooler') + ' than the front.';
+  let head = d >= 4 ? '+' + d + '° while you’re out.' : d <= -4 ? '−' + Math.abs(d) + '° while you’re out.' : 'Steady, feels like ' + Math.round((fa + fb) / 2) + '°.';
+  if (golf && idx.length > 2 && Math.abs(h2 - h1) >= 4) head += ' Back nine ' + (h2 > h1 ? '+' : '−') + Math.abs(h2 - h1) + '°.';
   const end = (label, i, t) => h('div', { class: 'endp', style: '--tc:' + tempColor(F(i)) }, h('div', { class: 'k' }, label + ', ' + fTime(t, tz)), h('div', { class: 'v' }, fT(H.temp[i]), icon(iconKind(H.code[i], H.isDay[i]))), h('div', { class: 'n' }, 'Feels like ' + Math.round(F(i)) + '°'));
   // what changes along the way, stated as facts
   const notes = [], at = i => fHour(H.t[i], tz);
@@ -2461,44 +2510,64 @@ R.week = function () {
 };
 
 // ---------- tiles: conditions ----------
+// One collapsible row: the label and a one-line note on the left, the number on the right; tap for the picture and the detail.
+// Which rows are open is remembered on this device.
+function Row(id, k, v, o) {
+  o = o || {};
+  const opened = store.get('rows-open', []) || [];
+  const body = h('div', { class: 'xb' }, o.g ? h('div', { class: 'g' }, o.g) : null, o.n ? h('p', { class: 'n' }, o.n) : null, o.more ? h('p', { class: 'xm' }, o.more) : null, o.lazy ? h('div', { class: 'xl' }) : null);
+  const d = h('details', { class: 'xr', 'data-row': id, style: '--ac:' + (o.c || 'var(--neutral)') },
+    h('summary', null, h('i', { class: 'xd', 'aria-hidden': 'true' }), h('span', { class: 'xk' }, h('b', null, k), o.sub ? h('span', null, o.sub) : null), h('span', { class: 'xv' }, v, o.unit ? h('small', null, o.unit) : null)), body);
+  let drawn = false;
+  const draw = () => { if (o.lazy && !drawn && d.open) { drawn = true; requestAnimationFrame(() => o.lazy(body.querySelector('.xl'))); } };
+  d.addEventListener('toggle', () => {
+    const a = store.get('rows-open', []) || [], i = a.indexOf(id);
+    if (d.open && i < 0) a.push(id); if (!d.open && i >= 0) a.splice(i, 1);
+    store.set('rows-open', a); draw();
+  });
+  if (opened.indexOf(id) >= 0) d.open = true;
+  return d;
+}
+const uvColor = u => u < 3 ? 'var(--good)' : u < 6 ? 'var(--warn)' : u < 8 ? 'var(--serious)' : 'var(--crit)';
+const aqColor = a => !isNum(a) || a <= 50 ? 'var(--good)' : a <= 100 ? 'var(--warn)' : a <= 150 ? 'var(--serious)' : 'var(--crit)';
+
 R.now = function () {
   const p = place(), now = S.now, tz = p.tz, wx = S.wx;
-  if (!wx || !wx.cur) { fill('now-body', h('div', { class: 'tl wide', style: 'min-height:0' }, waitMsg('wx', 'current conditions'))); fill('now-more'); return; }
+  if (!wx || !wx.cur) { fill('now-x'); fill('now-body', h('div', { class: 'xr', style: 'padding:12px 0' }, waitMsg('wx', 'current conditions'))); return; }
   const c = wx.cur, H = wx.h, hI = hourIdx(H.t, now);
   const tF = cToF(c.temp), aF = cToF(c.app), mph = kmh2mph(c.wind), gust = kmh2mph(c.gust), dewF = cToF(c.dew);
-  const wc = windChillF(tF, mph), t = [], x = [];
-  if (isNum(aF)) { const d = Math.round(aF) - Math.round(tF); t.push(T('Feels like', Math.round(aF) + '°', { c: tempColor(aF), n: d === 0 ? 'Same as the thermometer.' : d < 0 ? (wc != null && tF - wc >= 1.5 ? 'Wind takes off ' + Math.abs(d) + '°.' : Math.abs(d) + '° colder than the reading.') : (c.isDay && c.cloud < 60 ? 'Sun adds ' + d + '°.' : d + '° warmer than the reading.') })); }
-  t.push(T('Wind', isNum(mph) ? Math.round(mph) : '–', { c: '#1f9e9a', unit: 'mph', side: true, g: dial(c.wdir), n: (isNum(gust) ? 'Gusts ' + Math.round(gust) + '. ' : '') + 'From the ' + compass(c.wdir) + '.' }));
-  if (hI >= 0) { const next = H.pp.slice(hI, hI + 12); t.push(T('Rain, next 12 hours', isNum(H.pp[hI]) ? Math.round(H.pp[hI]) + '%' : '–', { c: 'var(--rain)', g: h('div', { class: 'spark', role: 'img', 'aria-label': 'Chance of rain for each of the next 12 hours' }, next.map(v => h('i', { style: 'height:' + Math.max(4, isNum(v) ? v : 0) + '%' }))), n: rainLine(wx, hI, now, tz) + '.' })); }
-  if (isNum(c.uv)) t.push(T('UV index', rnd(c.uv, 0), { c: c.uv < 3 ? 'var(--good)' : c.uv < 6 ? 'var(--warn)' : c.uv < 8 ? 'var(--serious)' : 'var(--crit)', unit: uvWord(c.uv), g: pinScale(c.uv, 12, UV_SEGS, 'UV index ' + rnd(c.uv, 0) + ' of 11 and up'), n: c.uv >= 3 ? 'Sunscreen.' : 'No protection needed.' }));
-  t.push(T('Humidity', fPct(c.rh), { c: '#2fa7c9', g: bar2((c.rh || 0) / 100), n: isNum(dewF) ? 'Dew point ' + Math.round(dewF) + '°, ' + dewWord(dewF) + '.' : '' }));
-  if (isNum(c.cloud)) x.push(T('Cloud cover', fPct(c.cloud), { c: 'var(--neutral)', g: bar2(c.cloud / 100), n: c.isDay ? (c.cloud < 30 ? 'Warmer in the sun than the shade.' : c.cloud < 70 ? 'Sun in and out.' : 'Sun and shade feel the same.') : (c.cloud < 30 ? 'Clear nights cool fastest.' : 'Cloud holds the warmth in.') }));
+  const wc = windChillF(tF, mph), r = [];
+  if (isNum(aF)) {
+    const d = Math.round(aF) - Math.round(tF);
+    const why = d === 0 ? 'Same as the thermometer' : d < 0 ? (wc != null && tF - wc >= 1.5 ? 'Wind takes off ' + Math.abs(d) + '°' : Math.abs(d) + '° colder than the reading') : (c.isDay && c.cloud < 60 ? 'Sun adds ' + d + '°' : d + '° warmer than the reading');
+    r.push(Row('feels', 'Feels like', Math.round(aF) + '°', { c: tempColor(aF), sub: why, n: 'Thermometer reads ' + Math.round(tF) + '°.', more: 'Feels like is the air temperature adjusted for wind, humidity and sun. In cool weather the wind does most of it.' }));
+  }
+  r.push(Row('wind', 'Wind', isNum(mph) ? Math.round(mph) : '–', { c: '#1f9e9a', unit: 'mph', sub: (isNum(gust) ? 'Gusts ' + Math.round(gust) + ', from the ' : 'From the ') + compass(c.wdir), g: dial(c.wdir), more: 'The arrow points the way the air is moving.' }));
+  if (hI >= 0) { const next = H.pp.slice(hI, hI + 12); r.push(Row('rain', 'Rain chance', isNum(H.pp[hI]) ? Math.round(H.pp[hI]) + '%' : '–', { c: 'var(--rain)', sub: rainLine(wx, hI, now, tz), g: h('div', { class: 'spark', role: 'img', 'aria-label': 'Chance of rain for each of the next 12 hours' }, next.map(v => h('i', { style: 'height:' + Math.max(4, isNum(v) ? v : 0) + '%' }))), n: 'Each bar is one of the next 12 hours.' })); }
+  if (isNum(c.uv)) r.push(Row('uv', 'UV index', rnd(c.uv, 0), { c: uvColor(c.uv), sub: uvWord(c.uv) + (c.uv >= 3 ? ', wear sunscreen' : ', no protection needed'), g: pinScale(c.uv, 12, UV_SEGS, 'UV index ' + rnd(c.uv, 0) + ' of 11 and up'), n: 'Sunscreen from 3 up. 8 and up burns in under 20 minutes.' }));
+  r.push(Row('humid', 'Humidity', fPct(c.rh), { c: '#2fa7c9', sub: isNum(dewF) ? 'Dew point ' + Math.round(dewF) + '°, ' + dewWord(dewF) : '', g: bar2((c.rh || 0) / 100), more: 'Dew point is the better comfort number: under 50° is crisp, 60° is sticky, 70° is tropical. Within about 4° of the temperature, expect fog, dew or frost.' }));
+  const x = [];
+  if (isNum(c.cloud)) x.push(Row('cloud', 'Cloud cover', fPct(c.cloud), { c: 'var(--neutral)', sub: c.isDay ? (c.cloud < 30 ? 'Warmer in the sun than the shade' : c.cloud < 70 ? 'Sun in and out' : 'Sun and shade feel the same') : (c.cloud < 30 ? 'Clear nights cool fastest' : 'Cloud holds the warmth in'), g: bar2(c.cloud / 100) }));
   const pt = hI >= 3 ? pressureTrend(wx, hI) : null;
-  if (isNum(c.pmsl)) x.push(T('Pressure', hpa2inhg(c.pmsl).toFixed(2), { unit: 'inHg', side: true, g: pt ? trendSvg(pt.d >= 0.5 ? 1 : pt.d <= -0.5 ? -1 : 0) : null, n: pt ? pt.word + '. ' + (pt.d >= 0.5 ? 'Clearing.' : pt.d <= -0.5 ? 'Weather on the way.' : 'No change coming.') : '' }));
-  if (isNum(c.vis)) { const mi = m2mi(c.vis); x.push(T('Visibility', mi >= 10 ? '10+' : rnd(mi, mi < 3 ? 1 : 0), { unit: 'mi', n: mi < 0.3 ? 'Dense fog.' : mi < 1 ? 'Fog.' : mi < 4 ? 'Mist or haze.' : 'Clear air.' })); }
+  if (isNum(c.pmsl)) x.push(Row('press', 'Pressure', hpa2inhg(c.pmsl).toFixed(2), { c: '#7a8aa0', unit: 'inHg', sub: pt ? pt.word + ', ' + (pt.d >= 0.5 ? 'clearing' : pt.d <= -0.5 ? 'weather on the way' : 'no change coming') : '', g: pt ? trendSvg(pt.d >= 0.5 ? 1 : pt.d <= -0.5 ? -1 : 0) : null, more: 'Pressure matters by direction. Falling means a system is coming, rising means it is clearing.' }));
+  if (isNum(c.vis)) { const mi = m2mi(c.vis); x.push(Row('vis', 'Visibility', mi >= 10 ? '10+' : rnd(mi, mi < 3 ? 1 : 0), { c: '#9aa7b8', unit: 'mi', sub: mi < 0.3 ? 'Dense fog' : mi < 1 ? 'Fog' : mi < 4 ? 'Mist or haze' : 'Clear air' })); }
   const flNow = hI >= 0 ? H.fl[hI] : null;
-  if (isNum(flNow)) x.push(T('Freezing level', fFt(flNow), { n: 'Snow can fall down to about ' + fFt(Math.max(0, flNow - 300)) + '.' }));
-  fill('now-body', t);
-  fill('now-more', x.length ? h('details', { class: 'how plain' }, h('summary', null, 'More conditions: cloud, pressure, visibility, freezing level'), h('div', { class: 'mini' }, x)) : null, how([
-    'Feels like is the air temperature adjusted for wind, humidity and sun. In cool weather wind does most of it (wind chill, which applies below 50°F with wind above 3 mph).',
-    'Dew point shows how much moisture is in the air: under 50°F is crisp, 60°F is sticky, 70°F is tropical. Within about 4°F of the temperature, expect fog, dew or frost.',
-    'Pressure matters by direction. Falling means a system is coming, rising means clearing.',
-    'The wind arrow points the way the air is moving.'
-  ], 'How to read the tiles'));
+  if (isNum(flNow)) x.push(Row('freeze', 'Freezing level', fFt(flNow), { c: 'var(--snow)', sub: 'Snow down to ' + fFt(Math.max(0, flNow - 300)), more: 'The height where the air drops to freezing. Snow usually reaches about 1,000 feet below it.' }));
+  fill('now-body', r);
+  fill('now-x', x);
 };
 
 R.air = function () {
   const p = place(), now = S.now, tz = p.tz, aq = S.aq;
-  if (!aq || !aq.cur) { fill('air-body'); fill('air-more'); return; }
+  if (!aq || !aq.cur) { fill('air-body'); return; }
   const c = aq.cur, cat = aqiCat(c.aqi), H = aq.h, i0 = Math.max(0, hourIdx(H.t, now));
   const sub = [['Fine particles (PM2.5)', c.pm25, H.aPm25[i0], 'Smoke and exhaust. The one that matters most here.'], ['Coarse particles (PM10)', c.pm10, H.aPm10[i0], 'Dust, road grit and pollen.'], ['Ozone', c.o3, H.aO3[i0], 'Forms in sunlight on hot afternoons.'], ['Nitrogen dioxide', c.no2, H.aNo2[i0], 'Traffic exhaust.'], ['Sulfur dioxide', c.so2, H.aSo2[i0], 'Industry and shipping.'], ['Carbon monoxide', c.co, H.aCo[i0], 'Combustion.']];
   const lead = sub.filter(r => isNum(r[2])).sort((a, b) => b[2] - a[2])[0];
-  fill('air-body', T('Air quality', isNum(c.aqi) ? Math.round(c.aqi) : '–', { c: !isNum(c.aqi) || c.aqi <= 50 ? 'var(--good)' : c.aqi <= 100 ? 'var(--warn)' : c.aqi <= 150 ? 'var(--serious)' : 'var(--crit)', unit: cat.name.replace('Unhealthy for sensitive groups', 'Sensitive'), g: pinScale(c.aqi || 0, 300, AQI_SEGS, 'Air quality index ' + Math.round(c.aqi) + ', where 0 to 50 is good'), n: lead ? 'Mostly ' + lead[0].replace(/ \(.*/, '').toLowerCase() + '.' : '' }));
   const draw = host => {
     const cHost = h('div');
-    fill(host, h('p', { class: 'sub' }, cat.advice), h('div', { class: 'pols' }, sub.map(r => h('div', { class: 'pol' }, h('div', { class: 'pol-h' }, h('b', null, r[0]), h('span', null, isNum(r[1]) ? rnd(r[1], r[1] < 10 ? 1 : 0) + ' µg/m³' : '–'), h('span', null, 'index ' + (isNum(r[2]) ? Math.round(r[2]) : '–'))), h('div', { class: 'pol-d' }, r[3])))),
+    fill(host, h('div', { class: 'pols' }, sub.map(r => h('div', { class: 'pol' }, h('div', { class: 'pol-h' }, h('b', null, r[0]), h('span', null, isNum(r[1]) ? rnd(r[1], r[1] < 10 ? 1 : 0) + ' µg/m³' : '–'), h('span', null, 'index ' + (isNum(r[2]) ? Math.round(r[2]) : '–'))), h('div', { class: 'pol-d' }, r[3])))),
       h('div', { class: 'chart-title' }, 'Air quality index, next four days'), cHost,
-      h('p', { class: 'sub' }, 'This is a regional model. For a measured reading nearby use ', ext('https://www.airnow.gov/', 'AirNow'), ' or its ', ext('https://fire.airnow.gov/', 'smoke map'), '. Under 50 is clean; above 100, sensitive people should ease off outside; above 150 everyone should.'));
+      h('p', { class: 'sub' }, 'This is a regional model. For a measured reading nearby use ', ext('https://www.airnow.gov/', 'AirNow'), ' or its ', ext('https://fire.airnow.gov/', 'smoke map'), '.'));
     const ix = []; for (let i = i0; i < Math.min(H.t.length, i0 + 96); i++) ix.push(i);
     const xs = ix.map(i => H.t[i]), vals = ix.map(i => H.aqi[i]);
     const top = Math.max(100, (maxOf(vals) || 0) + 15);
@@ -2506,29 +2575,30 @@ R.air = function () {
       refs: [{ y: 50, label: 'Moderate above 50', include: false, color: 'var(--warn)', left: true }, { y: 100, label: 'Sensitive groups above 100', include: false, color: 'var(--serious)', left: true }],
       tip: k => ({ title: fDow(xs[k], tz) + ' ' + fHour(xs[k], tz), rows: [{ name: 'Index', value: isNum(vals[k]) ? Math.round(vals[k]) : '–', color: 'var(--ink-2)' }, { name: 'Category', value: aqiCat(vals[k]).name }] }) });
   };
-  fill('air-more', lazy('Air quality: pollutants and the next four days', draw));
+  fill('air-body', Row('air', 'Air quality', isNum(c.aqi) ? Math.round(c.aqi) : '–', { c: aqColor(c.aqi), sub: cat.name + (lead ? ', mostly ' + lead[0].replace(/ \(.*/, '').toLowerCase() : ''), g: pinScale(c.aqi || 0, 300, AQI_SEGS, 'Air quality index ' + Math.round(c.aqi) + ', where 0 to 50 is good'), n: cat.advice, lazy: draw }));
 };
 
-// ---------- tiles: sun, moon, season ----------
+// ---------- sun, moon, season ----------
 R.light = function () {
   const p = place(), now = S.now, tz = p.tz, z = zparts(now, tz);
-  const sd = sunAt(p, now), y1 = sunOffset(p, now, -1), t = [];
+  const sd = sunAt(p, now), y1 = sunOffset(p, now, -1), r = [];
   const hasSun = !!(sd.sunrise && sd.sunset);
   const yt = yearTable(p, z.y), doy = dayOfYear(z.y, z.m, z.d), diy = daysInYear(z.y);
   if (hasSun) {
-    t.push(h('div', { class: 'tl wide tint sunt', style: '--ac:var(--sun)' }, h('div', { class: 'k' }, 'Sun'), h('div', { class: 'g' }, sunArc(p, now)),
-      h('div', { class: 'arc-times' }, h('div', null, 'Sunrise', h('br'), h('b', null, fTime(sd.sunrise, tz))), h('div', { style: 'text-align:center' }, 'First and last light', h('br'), h('b', null, fTime(sd.dawn, tz).replace(/ [AP]M/, '') + ' and ' + fTime(sd.dusk, tz).replace(/ [AP]M/, ''))), h('div', null, 'Sunset', h('br'), h('b', null, fTime(sd.sunset, tz))))));
+    const up = now > sd.sunrise && now < sd.sunset, nextRise = now < sd.sunrise ? sd.sunrise : sunOffset(p, now, 1).sunrise;
+    r.push(Row('sun', up ? 'Sunset' : 'Sunrise', fTime(up ? sd.sunset : nextRise, tz), { c: 'var(--sun)', sub: up ? 'Sunrise was ' + fTime(sd.sunrise, tz) : 'Sunset was ' + fTime(sd.sunset, tz),
+      g: h('div', null, sunArc(p, now), h('div', { class: 'arc-times' }, h('div', null, 'Sunrise', h('br'), h('b', null, fTime(sd.sunrise, tz))), h('div', { style: 'text-align:center' }, 'First and last light', h('br'), h('b', null, fTime(sd.dawn, tz).replace(/ [AP]M/, '') + ' and ' + fTime(sd.dusk, tz).replace(/ [AP]M/, ''))), h('div', null, 'Sunset', h('br'), h('b', null, fTime(sd.sunset, tz))))) }));
     const d1 = y1.len ? sd.len - y1.len : 0;
-    t.push(T('Daylight', fDur(sd.len), { c: 'var(--sun)', g: yearCurve(yt.map(d => d.len), doy - 1, 'var(--sun)'), n: fDurS(d1) + (d1 < 0 ? ' less' : ' more') + ' than yesterday.' }));
+    r.push(Row('daylight', 'Daylight', fDur(sd.len), { c: 'var(--sun)', sub: fDurS(d1) + (d1 < 0 ? ' less' : ' more') + ' than yesterday', g: yearCurve(yt.map(d => d.len), doy - 1, 'var(--sun)'), n: 'The curve is daylight across the whole year. The dot is today.' }));
     const sol = SEASON_EVENTS.find(e => e.t > now && (e.k === 'dec' || e.k === 'jun')), s2 = sol ? sunAt(p, sol.t) : null;
-    if (s2 && s2.len) { const shortest = s2.len < sd.len; t.push(T(shortest ? 'Shortest day' : 'Longest day', String(Math.max(0, daysBetween(now, sol.t, tz))), { c: shortest ? '#5b6fd6' : 'var(--sun)', unit: 'days', n: fMD(sol.t, tz) + ', ' + fDur(s2.len) + '. ' + fDurLoose(Math.abs(sd.len - s2.len)) + ' still to ' + (shortest ? 'lose.' : 'gain.') })); }
-  } else t.push(T('Sun', '–', { wide: true, n: 'The sun does not rise and set in the usual way here today.' }));
+    if (s2 && s2.len) { const shortest = s2.len < sd.len; r.push(Row('solstice', shortest ? 'Shortest day' : 'Longest day', String(Math.max(0, daysBetween(now, sol.t, tz))), { c: shortest ? '#5b6fd6' : 'var(--sun)', unit: 'days', sub: fMD(sol.t, tz) + ', ' + fDur(s2.len) + ' of daylight', n: fDurLoose(Math.abs(sd.len - s2.len)) + ' of daylight still to ' + (shortest ? 'lose before it turns around.' : 'gain.') })); }
+  } else r.push(Row('sun', 'Sun', '–', { sub: 'The sun does not rise and set in the usual way here today' }));
   const mo = S.moon;
-  if (mo) t.push(T('Moon', Math.round(mo.frac * 100) + '%', { c: '#8a7fd0', side: true, g: moonSvg(mo.frac, mo.waxing, 56), n: mo.name + '.' + (mo.nextFull ? ' Full ' + fMD(mo.nextFull.t, tz) + '.' : '') }));
+  if (mo) r.push(Row('moon', 'Moon', Math.round(mo.frac * 100) + '%', { c: '#8a7fd0', sub: mo.name + (mo.nextFull ? ', full ' + fMD(mo.nextFull.t, tz) : ''), g: moonSvg(mo.frac, mo.waxing, 64) }));
   const sea = seasonInfo(now, p.lat);
-  if (sea) t.push(T('Season', sea.name, { c: /Autumn|Fall/.test(sea.name) ? '#e07a2e' : /Winter/.test(sea.name) ? '#4a8fd8' : /Spring/.test(sea.name) ? '#4fb35c' : '#e5a823', side: true, g: ring(sea.frac, Math.round(sea.frac * 100) + '%'), n: plural(Math.max(0, Math.round((sea.end - now) / DAY)), 'day') + ' until ' + sea.next.toLowerCase() + '.' }));
-  t.push(T(String(z.y), 'Day ' + doy + ' of ' + diy, { c: '#4fb35c', wide: true, g: bar2(doy / diy), n: plural(diy - doy, 'day') + ' left, ' + Math.round(doy / diy * 100) + '% done.' }));
-  fill('light-body', t);
+  if (sea) r.push(Row('season', 'Season', sea.name, { c: /Autumn|Fall/.test(sea.name) ? '#e07a2e' : /Winter/.test(sea.name) ? '#4a8fd8' : /Spring/.test(sea.name) ? '#4fb35c' : '#e5a823', sub: plural(Math.max(0, Math.round((sea.end - now) / DAY)), 'day') + ' until ' + sea.next.toLowerCase(), g: ring(sea.frac, Math.round(sea.frac * 100) + '%'), n: Math.round(sea.frac * 100) + '% of the way through ' + sea.name.toLowerCase() + '.' }));
+  r.push(Row('year', String(z.y), 'Day ' + doy, { c: '#4fb35c', sub: plural(diy - doy, 'day') + ' left', g: bar2(doy / diy), n: Math.round(doy / diy * 100) + '% of the year is done.' }));
+  fill('light-body', r);
   // dates coming up
   const ms = (S.ms || []).slice(0, 8), cards = ms.map(e => { const n = daysBetween(now, e.t, tz); return h('div', { class: 'dc', title: e.detail || '' }, h('div', { class: 'in' }, n <= 0 ? 'Today' : n + (n === 1 ? ' day' : ' days')), h('div', { class: 'lb' }, e.label), h('div', { class: 'dt' }, fDowMD(e.t, tz))); });
   nextShowers(p, now, 1).forEach(x => { const n = daysBetween(now, x.t, tz); cards.push(h('div', { class: 'dc', title: x.rate }, h('div', { class: 'in' }, n <= 0 ? 'Tonight' : n + (n === 1 ? ' day' : ' days')), h('div', { class: 'lb' }, x.name + ' meteor shower'), h('div', { class: 'dt' }, fDowMD(x.t, tz) + ', moon ' + Math.round(x.moon * 100) + '% lit'))); });
@@ -2697,10 +2767,10 @@ const sectionOff = id => S.blocked || (id === 'mountains' && !inNorthwest(place(
 function renderAll() {
   document.body.classList.toggle('blocked', !!S.blocked);
   LIVE_SECTIONS.forEach(id => $(id).classList.toggle('hidden', sectionOff(id)));
-  if (S.blocked) { fill('now-more'); fill('air-more'); }
+  $('conds').classList.toggle('hidden', !!S.blocked);
   ['welcome', 'hero', 'brief', 'now', 'hours', 'plan', 'week', 'light', 'air', 'mountains', 'ahead', 'history', 'stars', 'foot'].forEach(renderOne);
 }
-const MORE = { now: 'now-more', air: 'air-more', light: 'light-more' };
+const MORE = { light: 'light-more' };
 function renderOne(name) {
   if (LIVE_SECTIONS.indexOf(name) >= 0 && sectionOff(name)) return;
   const body = $(MORE[name] || name + '-body');
