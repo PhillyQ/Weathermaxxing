@@ -573,44 +573,46 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .mc{box-shadow:inset 0 3px 0 var(--snow)}
 .wear-top,.gear .g{background:color-mix(in srgb,#4fb35c 10%,var(--page))}
 
-/* collapsible rows */
-.xrows{margin-top:4px}
-.xr{border-top:1px solid var(--hair)}
-.xrows .xr:first-child,.xrows .contents:first-child>.contents>.xr:first-child{border-top:0}
-.xr summary{display:grid;grid-template-columns:10px minmax(0,1fr) auto 12px;align-items:center;column-gap:12px;padding:11px 0;cursor:pointer;list-style:none;-webkit-tap-highlight-color:transparent}
-.xr summary::-webkit-details-marker{display:none}
-.xr summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s}
-.xr[open] summary::after{transform:rotate(225deg) translate(-2px,-2px)}
-.xd{width:10px;height:10px;border-radius:50%;background:var(--ac)}
-.xk{min-width:0;display:flex;flex-direction:column;gap:1px}
-.xk b{font-size:15.5px;font-weight:700;line-height:1.2}
-.xk span{font-size:13px;color:var(--ink-2);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.xr[open] .xk span{white-space:normal}
-.xv{font-size:22px;font-weight:780;font-variant-numeric:tabular-nums;font-stretch:104%;letter-spacing:-.01em;white-space:nowrap;text-align:right}
-.xv small{font-size:13px;font-weight:650;color:var(--ink-2);margin-left:3px;letter-spacing:0}
-.xb{padding:2px 0 14px 22px;--card:var(--panel)}
-.xb .g{margin:4px 0 8px}
-.xb .g>.bar2,.xb .g>.pscale,.xb .g>.spark{max-width:420px}
-.xb .bar2{background:color-mix(in srgb,var(--ac) 18%,var(--page))}
-.xb .bar2 i,.xb .spark i{background:var(--ac)}
-.xb .ringv circle:last-of-type{stroke:var(--ac)!important}
-.xb .dial path{stroke:var(--ac)!important}
-.xb .dial{width:84px;height:84px}
-.xb .n,.xb .xm{font-size:13.5px;color:var(--ink-2);line-height:1.45;margin:6px 0 0;max-width:60ch}
-.xb .xm{color:var(--muted)}
-.xb .arc{max-width:520px}
-.xb .arc-times{max-width:520px}
-.xb .pols{margin-top:8px}
-.xsep{height:6px;border-top:1px solid var(--hair);margin-top:0}
-.xsep+.xr{border-top:0}
-#conds>h2{--hd:linear-gradient(135deg,#1f9e9a,#2a78d6)}
-#sunsea>h2{--hd:linear-gradient(135deg,#eda100,#8a7fd0)}
 
-.hero-story{display:flex;flex-wrap:wrap;gap:6px;font-size:15px;font-weight:650;max-width:none}
-.hero-story .sc{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.5);border-radius:999px;padding:6px 12px 6px 9px;line-height:1.1;white-space:nowrap}
-.hero.night .hero-story .sc{background:rgba(255,255,255,.14)}
-.hero-story .sc svg{width:17px;height:17px;flex:none}
-@media (min-width:980px){.hero-story{font-size:16px;align-self:end}}
+/* tile icons */
+.tl .k{display:flex;align-items:center;gap:6px}
+.tl .k .ti{width:17px;height:17px;flex:none;color:var(--ac,var(--ink-2))}
+.tl.tint.hasi .k::before{display:none}
+.tbar{position:relative;height:8px;border-radius:4px;background:linear-gradient(90deg,#5b5bd6,#3aa0e0,#2fb5b5,#6cc06a,#e5bd34,#f0923a,#d63d4a)}
+.tbar i{position:absolute;top:-4px;width:6px;height:16px;border-radius:3px;background:var(--ink);box-shadow:0 0 0 2px var(--card);transform:translateX(-3px)}
+
+/* trend arrows */
+.tr{display:inline-flex;align-items:center;gap:3px;font-weight:700;white-space:nowrap}
+.tr svg{width:1.05em;height:1.05em;flex:none}
+.tr-up svg{color:#e8603a}.tr-down svg{color:#3f7fe0}.tr-flat svg{color:var(--muted)}
+.tr-sunup svg{color:var(--sun)}.tr-sundown svg{color:#5b6fd6}
+.hsep{display:inline-block;width:14px}
+.hero-story .sc-up svg{color:#e8603a}.hero-story .sc-down svg{color:#3f7fe0}
+.hero-story .sc-drop svg{color:var(--rain)}.hero-story .sc-wind svg{color:#1f9e9a}.hero-story .sc-sun svg{color:var(--sun)}
+.hero.night .hero-story .sc-up svg{color:#ff9a6b}.hero.night .hero-story .sc-down svg{color:#8fb6ff}.hero.night .hero-story .sc-drop svg{color:#8fc0ff}
+
+/* stacks: fanned out like a hand of cards, or squared up like a solitaire column */
+.stack{display:flex;flex-direction:column;gap:8px;min-width:0}
+.stk-h{appearance:none;border:0;background:none;font:inherit;color:var(--ink);display:flex;align-items:center;gap:10px;padding:4px 4px 0;cursor:pointer;text-align:left}
+.stk-ic{width:14px;height:14px;border-radius:4px;flex:none}
+.stk-ic-comfort{background:linear-gradient(135deg,#2fa7c9,#e8603a)}.stk-ic-sky{background:linear-gradient(135deg,#7f8fa6,#2a78d6)}
+.stk-ic-sun{background:linear-gradient(135deg,#eda100,#f0923a)}.stk-ic-moon{background:linear-gradient(135deg,#8a7fd0,#4fb35c)}
+.stk-t{font-size:15px;font-weight:750;font-stretch:106%;flex:1}
+.stk-hint{font-size:12px;color:var(--muted);font-weight:600}
+.stack.closed .stk-hint::before{content:"Tap to spread "}
+.stack.closed .stk-hint{font-size:0}.stack.closed .stk-hint::before{font-size:12px}
+.stk-chev{width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(225deg) translate(-2px,-2px);transition:transform .2s}
+.stack.closed .stk-chev{transform:rotate(45deg) translate(-2px,-2px)}
+.stk-b{transition:none}
+.stack.closed .stk-b{display:flex;flex-direction:column;gap:0;cursor:pointer}
+.stack.closed .stk-b .contents{display:contents}
+.stack.closed .tl,.stack.closed .tl.side{display:flex;flex-direction:row;align-items:center;gap:10px;min-height:0;padding:11px 14px 25px;margin-top:-16px;border-radius:16px;box-shadow:inset 0 3px 0 var(--ac,var(--axis)),0 -6px 14px -6px rgba(14,27,42,.22)}
+.stack.closed .tl:first-child,.stack.closed .contents:first-child>.tl:first-child,.stack.closed .contents:first-child>.contents:first-child>.tl:first-child{margin-top:0}
+.stack.closed .tl:last-child{padding-bottom:11px}
+.stack.closed .tl .g,.stack.closed .tl .n{display:none}
+.stack.closed .tl .k{flex:1;font-size:14px;color:var(--ink)}
+.stack.closed .tl .v{font-size:21px;margin:0}
+@media (prefers-reduced-motion:no-preference){.stack .tl{transition:margin .18s ease,padding .18s ease}}
 
 </style>
 </head>
@@ -643,8 +645,23 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
       <section class="card" id="week"><h2>The days ahead</h2><div id="week-body"></div></section>
     </div>
     <div class="col">
-      <section class="card" id="conds"><h2>Right now</h2><div class="xrows"><div class="contents" id="now"><div class="contents" id="now-body"></div></div><div class="contents" id="air"><div class="contents" id="air-body"></div></div><div class="contents" id="now-x"></div></div></section>
-      <section class="card" id="sunsea"><h2>Sun and season</h2><div class="xrows"><div class="contents" id="light"><div class="contents" id="light-body"></div></div></div></section>
+      <section class="stack" data-stack="comfort" id="stk-comfort">
+        <button class="stk-h" type="button" aria-expanded="true"><span class="stk-ic stk-ic-comfort" aria-hidden="true"></span><span class="stk-t">How it feels</span><span class="stk-hint">Tap to stack</span><span class="stk-chev" aria-hidden="true"></span></button>
+        <div class="tiles stk-b"><div class="contents" id="now"><div class="contents" id="now-body"></div></div><div class="contents" id="air"><div class="contents" id="air-body"></div></div></div>
+      </section>
+      <div class="more" id="air-more"></div>
+      <section class="stack" data-stack="sky" id="stk-sky">
+        <button class="stk-h" type="button" aria-expanded="true"><span class="stk-ic stk-ic-sky" aria-hidden="true"></span><span class="stk-t">Rain and sky</span><span class="stk-hint">Tap to stack</span><span class="stk-chev" aria-hidden="true"></span></button>
+        <div class="tiles stk-b"><div class="contents" id="now-x"></div></div>
+      </section>
+      <section class="stack" data-stack="sun" id="stk-sun">
+        <button class="stk-h" type="button" aria-expanded="true"><span class="stk-ic stk-ic-sun" aria-hidden="true"></span><span class="stk-t">Sun and daylight</span><span class="stk-hint">Tap to stack</span><span class="stk-chev" aria-hidden="true"></span></button>
+        <div class="tiles stk-b"><div class="contents" id="light"><div class="contents" id="light-body"></div></div></div>
+      </section>
+      <section class="stack" data-stack="moon" id="stk-moon">
+        <button class="stk-h" type="button" aria-expanded="true"><span class="stk-ic stk-ic-moon" aria-hidden="true"></span><span class="stk-t">Moon and season</span><span class="stk-hint">Tap to stack</span><span class="stk-chev" aria-hidden="true"></span></button>
+        <div class="tiles stk-b"><div class="contents" id="moon-body"></div></div>
+      </section>
       <section class="card" id="dates"><h2>Coming up</h2><div id="light-more"></div></section>
       <section class="card" id="fact"><h2>Cool to know</h2><div id="fact-body"></div></section>
     </div>
@@ -2185,7 +2202,7 @@ function tempColor(f) {
 const tcC = c => tempColor(cToF(c));
 function T(k, v, o) {
   o = o || {};
-  return h('div', { class: 'tl' + (o.wide ? ' wide' : '') + (o.side ? ' side' : '') + (o.c ? ' tint' : ''), style: o.c ? '--ac:' + o.c : null }, h('div', { class: 'k' }, k), h('div', { class: 'v' }, v, o.unit ? h('small', null, o.unit) : null), o.g ? h('div', { class: 'g' }, o.g) : null, o.n ? h('div', { class: 'n' }, o.n) : null);
+  return h('div', { class: 'tl' + (o.wide ? ' wide' : '') + (o.side ? ' side' : '') + (o.c ? ' tint' : '') + (o.i ? ' hasi' : ''), style: o.c ? '--ac:' + o.c : null }, h('div', { class: 'k' }, o.i ? tileIcon(o.i) : null, h('span', null, k)), h('div', { class: 'v' }, v, o.unit ? h('small', null, o.unit) : null), o.g ? h('div', { class: 'g' }, o.g) : null, o.n ? h('div', { class: 'n' }, o.n) : null);
 }
 const bar2 = (frac, color) => h('div', { class: 'bar2' }, h('i', { style: 'width:' + rnd(clamp(frac, 0, 1) * 100, 1) + '%' + (color ? ';background:' + color : '') }));
 function pinScale(val, max, segs, label) {
@@ -2289,11 +2306,11 @@ function dayStory(wx, p, now, i0) {
   if (z.h >= 18 || today.length < 3) {
     const night = []; for (let i = i0; i < Math.min(H.t.length, i0 + 14); i++) night.push(i);
     const lowI = night.reduce((b, i) => H.temp[i] < H.temp[b] ? i : b, i0);
-    out.push(nowF - F(lowI) >= 3 ? ['down', '−' + (nowF - F(lowI)) + '° to ' + F(lowI) + '° by ' + fHour(H.t[lowI], tz)] : ['flat', 'Steady near ' + nowF + '°']);
+    out.push(nowF - F(lowI) >= 3 ? ['down', (nowF - F(lowI)) + '° to ' + F(lowI) + '° by ' + fHour(H.t[lowI], tz)] : ['flat', 'Steady near ' + nowF + '°']);
   } else {
     const peakI = today.reduce((b, i) => H.temp[i] > H.temp[b] ? i : b, i0), eveI = today.find(i => zparts(H.t[i], tz).h === 20) || today[today.length - 1];
-    if (peakI > i0 && F(peakI) - nowF >= 3) out.push(['up', '+' + (F(peakI) - nowF) + '° to ' + F(peakI) + '° by ' + fHour(H.t[peakI], tz)]);
-    else if (nowF - F(eveI) >= 3) out.push(['down', '−' + (nowF - F(eveI)) + '° to ' + F(eveI) + '° by ' + fHour(H.t[eveI], tz)]);
+    if (peakI > i0 && F(peakI) - nowF >= 3) out.push(['up', (F(peakI) - nowF) + '° to ' + F(peakI) + '° by ' + fHour(H.t[peakI], tz)]);
+    else if (nowF - F(eveI) >= 3) out.push(['down', (nowF - F(eveI)) + '° to ' + F(eveI) + '° by ' + fHour(H.t[eveI], tz)]);
     else out.push(['flat', 'Steady near ' + nowF + '°']);
     const c0 = H.cloud[i0], wetNow = isNum(H.pp[i0]) && H.pp[i0] >= 50;
     if (!wetNow && isNum(c0)) {
@@ -2306,7 +2323,7 @@ function dayStory(wx, p, now, i0) {
   const span = today.length >= 3 ? today : (() => { const a = []; for (let i = i0; i < Math.min(H.t.length, i0 + 12); i++) a.push(i); return a; })();
   const gI = span.reduce((b, i) => H.gust[i] > H.gust[b] ? i : b, i0);
   if (isNum(H.gust[gI]) && kmh2mph(H.gust[gI]) >= 25) out.push(['wind', 'Gusts ' + fMph(H.gust[gI]) + ' mph ' + fHour(H.t[gI], tz)]);
-  if (i0 >= 24 && isNum(H.temp[i0 - 24])) { const d = nowF - F(i0 - 24); if (Math.abs(d) >= 3) out.push(['cal', (d > 0 ? '+' : '−') + Math.abs(d) + '° vs yesterday']); }
+  if (i0 >= 24 && isNum(H.temp[i0 - 24])) { const d = nowF - F(i0 - 24); if (Math.abs(d) >= 3) out.push([d > 0 ? 'up' : 'down', Math.abs(d) + '° vs yesterday']); }
   return out.slice(0, 5);
 }
 // Today's temperature from midnight to midnight, with a dot for now and the high and low marked.
@@ -2350,7 +2367,7 @@ R.hero = function () {
     if (isNum(c.app)) side.push(h('span', null, 'Feels like ' + fT(c.app)));
     if (di >= 0) side.push(h('span', null, 'High ' + fT(wx.d.tmax[di]) + '  Low ' + fT(wx.d.tmin[di])));
     fill('hero-main', h('div', { class: 'hero-temp' }, fT(c.temp)), h('div', { class: 'hero-cond' }, icon(iconKind(c.code, c.isDay)), side));
-    fill('hero-story', i0 >= 0 ? dayStory(wx, p, now, i0).map(x => h('span', { class: 'sc' }, storyIcon(x[0]), x[1])) : null);
+    fill('hero-story', i0 >= 0 ? dayStory(wx, p, now, i0).map(x => h('span', { class: 'sc sc-' + x[0] }, storyIcon(x[0]), x[1])) : null);
     fill('hero-curve', i0 >= 0 ? dayCurve(wx, p, now) : null);
     if (di >= 0 && isNum(wx.d.tmax[di + 1])) chips.push(chip('Tomorrow ' + fT(wx.d.tmax[di + 1]) + ' / ' + fT(wx.d.tmin[di + 1])));
     if (S.aq && S.aq.cur && isNum(S.aq.cur.aqi) && S.aq.cur.aqi > 50) chips.push(chip('Air: ' + aqiCat(S.aq.cur.aqi).name.toLowerCase(), null, aqiCat(S.aq.cur.aqi).dot));
@@ -2448,8 +2465,8 @@ function renderPlanOut() {
   const fa = Math.round(F(ia)), fb = Math.round(F(ib)), d = fb - fa;
   const idx = []; for (let i = ia; i <= ib; i++) idx.push(i);
   const mid = Math.ceil(idx.length / 2), h1 = Math.round(meanOf(idx.slice(0, mid).map(F))), h2 = Math.round(meanOf(idx.slice(mid).map(F)));
-  let head = d >= 4 ? '+' + d + '° while you’re out.' : d <= -4 ? '−' + Math.abs(d) + '° while you’re out.' : 'Steady, feels like ' + Math.round((fa + fb) / 2) + '°.';
-  if (golf && idx.length > 2 && Math.abs(h2 - h1) >= 4) head += ' Back nine ' + (h2 > h1 ? '+' : '−') + Math.abs(h2 - h1) + '°.';
+  const head = [Math.abs(d) >= 4 ? trendTxt(d, Math.abs(d) + '° while you’re out') : 'Steady, feels like ' + Math.round((fa + fb) / 2) + '°'];
+  if (golf && idx.length > 2 && Math.abs(h2 - h1) >= 4) head.push(h('span', { class: 'hsep' }), 'Back nine ', trendTxt(h2 - h1, Math.abs(h2 - h1) + '°'));
   const end = (label, i, t) => h('div', { class: 'endp', style: '--tc:' + tempColor(F(i)) }, h('div', { class: 'k' }, label + ', ' + fTime(t, tz)), h('div', { class: 'v' }, fT(H.temp[i]), icon(iconKind(H.code[i], H.isDay[i]))), h('div', { class: 'n' }, 'Feels like ' + Math.round(F(i)) + '°'));
   // what changes along the way, stated as facts
   const notes = [], at = i => fHour(H.t[i], tz);
@@ -2510,62 +2527,71 @@ R.week = function () {
 };
 
 // ---------- tiles: conditions ----------
-// One collapsible row: the label and a one-line note on the left, the number on the right; tap for the picture and the detail.
-// Which rows are open is remembered on this device.
-function Row(id, k, v, o) {
-  o = o || {};
-  const opened = store.get('rows-open', []) || [];
-  const body = h('div', { class: 'xb' }, o.g ? h('div', { class: 'g' }, o.g) : null, o.n ? h('p', { class: 'n' }, o.n) : null, o.more ? h('p', { class: 'xm' }, o.more) : null, o.lazy ? h('div', { class: 'xl' }) : null);
-  const d = h('details', { class: 'xr', 'data-row': id, style: '--ac:' + (o.c || 'var(--neutral)') },
-    h('summary', null, h('i', { class: 'xd', 'aria-hidden': 'true' }), h('span', { class: 'xk' }, h('b', null, k), o.sub ? h('span', null, o.sub) : null), h('span', { class: 'xv' }, v, o.unit ? h('small', null, o.unit) : null)), body);
-  let drawn = false;
-  const draw = () => { if (o.lazy && !drawn && d.open) { drawn = true; requestAnimationFrame(() => o.lazy(body.querySelector('.xl'))); } };
-  d.addEventListener('toggle', () => {
-    const a = store.get('rows-open', []) || [], i = a.indexOf(id);
-    if (d.open && i < 0) a.push(id); if (!d.open && i >= 0) a.splice(i, 1);
-    store.set('rows-open', a); draw();
-  });
-  if (opened.indexOf(id) >= 0) d.open = true;
-  return d;
+// Small line icons for tiles and chips.
+const TILE_ICON = {
+  therm: 'M10 14.5V5a2 2 0 1 1 4 0v9.5a4 4 0 1 1-4 0zM12 9v8', wind: 'M3 9h10a3 3 0 1 0-3-3M3 14h15a3 3 0 1 1-3 3M3 11.5h6',
+  drop: 'M12 3s-6 7-6 11a6 6 0 0 0 12 0c0-4-6-11-6-11z', uv: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2',
+  leaf: 'M5 19c0-8 6-14 15-14 0 9-6 15-14 15M5 19l7-7', umbrella: 'M3 12a9 9 0 0 1 18 0zM12 12v7a2 2 0 0 1-4 0',
+  cloud: 'M7 18h10a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.7 1.5A3.3 3.3 0 0 0 7 18z', eye: 'M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z',
+  gauge: 'M4 16a8 8 0 1 1 16 0M12 16l4-5', snow: 'M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5 12 6l2.5-1.5M9.5 19.5 12 18l2.5 1.5',
+  sunrise: 'M3 18h18M6 18a6 6 0 0 1 12 0M12 6V3M5 10 3.5 8.5M19 10l1.5-1.5', hour: 'M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9',
+  cal: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4', moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z', season: 'M12 3c4 4 6 7 6 10a6 6 0 0 1-12 0c0-3 2-6 6-10zM12 21v-6'
+};
+const tileIcon = k => s('svg', { viewBox: '0 0 24 24', class: 'ti', 'aria-hidden': 'true' }, s('path', { d: TILE_ICON[k], fill: 'none', stroke: 'currentColor', 'stroke-width': 1.9, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+// An up or down arrow, colored warm for rising and cool for falling, beside a number.
+function trendTxt(dir, text, kind) {
+  const d = dir > 0 ? 'M12 19V5M12 5l-5 5M12 5l5 5' : dir < 0 ? 'M12 5v14M12 19l-5-5M12 19l5-5' : 'M4 12h16M20 12l-5-5M20 12l-5 5';
+  const cls = kind === 'light' ? (dir > 0 ? 'tr-sunup' : 'tr-sundown') : (dir > 0 ? 'tr-up' : dir < 0 ? 'tr-down' : 'tr-flat');
+  return h('span', { class: 'tr ' + cls }, s('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }, s('path', { d, fill: 'none', stroke: 'currentColor', 'stroke-width': 2.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })), text);
 }
 const uvColor = u => u < 3 ? 'var(--good)' : u < 6 ? 'var(--warn)' : u < 8 ? 'var(--serious)' : 'var(--crit)';
 const aqColor = a => !isNum(a) || a <= 50 ? 'var(--good)' : a <= 100 ? 'var(--warn)' : a <= 150 ? 'var(--serious)' : 'var(--crit)';
 
+// Stacks: each group of tiles can be fanned out like a hand of cards or squared up into a stack
+// that shows only each card's top edge, like a column in solitaire. Tapping a stack opens it; the choice is remembered.
+function initStacks() {
+  const closed = store.get('stacks-closed', []) || [];
+  Array.prototype.forEach.call(document.querySelectorAll('.stack'), st => {
+    const id = st.getAttribute('data-stack'), btn = st.querySelector('.stk-h');
+    const set = open => { st.classList.toggle('closed', !open); btn.setAttribute('aria-expanded', String(open)); };
+    set(closed.indexOf(id) < 0);
+    const toggle = () => { const open = st.classList.contains('closed'); set(open); const a = (store.get('stacks-closed', []) || []).filter(x => x !== id); if (!open) a.push(id); store.set('stacks-closed', a); };
+    btn.addEventListener('click', toggle);
+    st.querySelector('.stk-b').addEventListener('click', e => { if (st.classList.contains('closed')) { e.preventDefault(); toggle(); } }, true);
+  });
+}
+
 R.now = function () {
   const p = place(), now = S.now, tz = p.tz, wx = S.wx;
-  if (!wx || !wx.cur) { fill('now-x'); fill('now-body', h('div', { class: 'xr', style: 'padding:12px 0' }, waitMsg('wx', 'current conditions'))); return; }
+  if (!wx || !wx.cur) { fill('now-x'); fill('now-body', h('div', { class: 'tl wide', style: 'min-height:0' }, waitMsg('wx', 'current conditions'))); return; }
   const c = wx.cur, H = wx.h, hI = hourIdx(H.t, now);
   const tF = cToF(c.temp), aF = cToF(c.app), mph = kmh2mph(c.wind), gust = kmh2mph(c.gust), dewF = cToF(c.dew);
-  const wc = windChillF(tF, mph), r = [];
-  if (isNum(aF)) {
-    const d = Math.round(aF) - Math.round(tF);
-    const why = d === 0 ? 'Same as the thermometer' : d < 0 ? (wc != null && tF - wc >= 1.5 ? 'Wind takes off ' + Math.abs(d) + '°' : Math.abs(d) + '° colder than the reading') : (c.isDay && c.cloud < 60 ? 'Sun adds ' + d + '°' : d + '° warmer than the reading');
-    r.push(Row('feels', 'Feels like', Math.round(aF) + '°', { c: tempColor(aF), sub: why, n: 'Thermometer reads ' + Math.round(tF) + '°.', more: 'Feels like is the air temperature adjusted for wind, humidity and sun. In cool weather the wind does most of it.' }));
-  }
-  r.push(Row('wind', 'Wind', isNum(mph) ? Math.round(mph) : '–', { c: '#1f9e9a', unit: 'mph', sub: (isNum(gust) ? 'Gusts ' + Math.round(gust) + ', from the ' : 'From the ') + compass(c.wdir), g: dial(c.wdir), more: 'The arrow points the way the air is moving.' }));
-  if (hI >= 0) { const next = H.pp.slice(hI, hI + 12); r.push(Row('rain', 'Rain chance', isNum(H.pp[hI]) ? Math.round(H.pp[hI]) + '%' : '–', { c: 'var(--rain)', sub: rainLine(wx, hI, now, tz), g: h('div', { class: 'spark', role: 'img', 'aria-label': 'Chance of rain for each of the next 12 hours' }, next.map(v => h('i', { style: 'height:' + Math.max(4, isNum(v) ? v : 0) + '%' }))), n: 'Each bar is one of the next 12 hours.' })); }
-  if (isNum(c.uv)) r.push(Row('uv', 'UV index', rnd(c.uv, 0), { c: uvColor(c.uv), sub: uvWord(c.uv) + (c.uv >= 3 ? ', wear sunscreen' : ', no protection needed'), g: pinScale(c.uv, 12, UV_SEGS, 'UV index ' + rnd(c.uv, 0) + ' of 11 and up'), n: 'Sunscreen from 3 up. 8 and up burns in under 20 minutes.' }));
-  r.push(Row('humid', 'Humidity', fPct(c.rh), { c: '#2fa7c9', sub: isNum(dewF) ? 'Dew point ' + Math.round(dewF) + '°, ' + dewWord(dewF) : '', g: bar2((c.rh || 0) / 100), more: 'Dew point is the better comfort number: under 50° is crisp, 60° is sticky, 70° is tropical. Within about 4° of the temperature, expect fog, dew or frost.' }));
-  const x = [];
-  if (isNum(c.cloud)) x.push(Row('cloud', 'Cloud cover', fPct(c.cloud), { c: 'var(--neutral)', sub: c.isDay ? (c.cloud < 30 ? 'Warmer in the sun than the shade' : c.cloud < 70 ? 'Sun in and out' : 'Sun and shade feel the same') : (c.cloud < 30 ? 'Clear nights cool fastest' : 'Cloud holds the warmth in'), g: bar2(c.cloud / 100) }));
+  const wc = windChillF(tF, mph), a = [], b = [];
+  if (isNum(aF)) { const d = Math.round(aF) - Math.round(tF); a.push(T('Feels like', Math.round(aF) + '°', { i: 'therm', c: tempColor(aF), g: h('div', { class: 'tbar', style: '--tc:' + tempColor(aF) }, h('i', { style: 'left:' + rnd(clamp((aF - 10) / 90, 0, 1) * 100, 1) + '%' })), n: d === 0 ? 'Same as the thermometer.' : d < 0 ? (wc != null && tF - wc >= 1.5 ? 'Wind takes off ' + Math.abs(d) + '°.' : Math.abs(d) + '° colder than the reading.') : (c.isDay && c.cloud < 60 ? 'Sun adds ' + d + '°.' : d + '° warmer than the reading.') })); }
+  a.push(T('Wind', isNum(mph) ? Math.round(mph) : '–', { i: 'wind', c: '#1f9e9a', unit: 'mph', side: true, g: dial(c.wdir), n: (isNum(gust) ? 'Gusts ' + Math.round(gust) + '. ' : '') + 'From the ' + compass(c.wdir) + '.' }));
+  a.push(T('Humidity', fPct(c.rh), { i: 'drop', c: '#2fa7c9', g: bar2((c.rh || 0) / 100), n: isNum(dewF) ? 'Dew point ' + Math.round(dewF) + '°, ' + dewWord(dewF) + '.' : '' }));
+  if (isNum(c.uv)) a.push(T('UV index', rnd(c.uv, 0), { i: 'uv', c: uvColor(c.uv), unit: uvWord(c.uv), g: pinScale(c.uv, 12, UV_SEGS, 'UV index ' + rnd(c.uv, 0) + ' of 11 and up'), n: c.uv >= 3 ? 'Sunscreen.' : 'No protection needed.' }));
+  if (hI >= 0) { const next = H.pp.slice(hI, hI + 12); b.push(T('Rain, next 12 hrs', isNum(H.pp[hI]) ? Math.round(H.pp[hI]) + '%' : '–', { i: 'umbrella', c: 'var(--rain)', g: h('div', { class: 'spark', role: 'img', 'aria-label': 'Chance of rain for each of the next 12 hours' }, next.map(v => h('i', { style: 'height:' + Math.max(4, isNum(v) ? v : 0) + '%' }))), n: rainLine(wx, hI, now, tz) + '.' })); }
+  if (isNum(c.cloud)) b.push(T('Cloud cover', fPct(c.cloud), { i: 'cloud', c: '#7f8fa6', g: bar2(c.cloud / 100), n: c.isDay ? (c.cloud < 30 ? 'Warmer in sun than shade.' : c.cloud < 70 ? 'Sun in and out.' : 'Sun and shade feel the same.') : (c.cloud < 30 ? 'Clear nights cool fastest.' : 'Cloud holds the warmth in.') }));
   const pt = hI >= 3 ? pressureTrend(wx, hI) : null;
-  if (isNum(c.pmsl)) x.push(Row('press', 'Pressure', hpa2inhg(c.pmsl).toFixed(2), { c: '#7a8aa0', unit: 'inHg', sub: pt ? pt.word + ', ' + (pt.d >= 0.5 ? 'clearing' : pt.d <= -0.5 ? 'weather on the way' : 'no change coming') : '', g: pt ? trendSvg(pt.d >= 0.5 ? 1 : pt.d <= -0.5 ? -1 : 0) : null, more: 'Pressure matters by direction. Falling means a system is coming, rising means it is clearing.' }));
-  if (isNum(c.vis)) { const mi = m2mi(c.vis); x.push(Row('vis', 'Visibility', mi >= 10 ? '10+' : rnd(mi, mi < 3 ? 1 : 0), { c: '#9aa7b8', unit: 'mi', sub: mi < 0.3 ? 'Dense fog' : mi < 1 ? 'Fog' : mi < 4 ? 'Mist or haze' : 'Clear air' })); }
+  if (isNum(c.pmsl)) b.push(T('Pressure', hpa2inhg(c.pmsl).toFixed(2), { i: 'gauge', c: '#8a7fd0', unit: 'inHg', side: true, g: pt ? trendSvg(pt.d >= 0.5 ? 1 : pt.d <= -0.5 ? -1 : 0) : null, n: pt ? pt.word + '. ' + (pt.d >= 0.5 ? 'Clearing.' : pt.d <= -0.5 ? 'Weather on the way.' : 'No change coming.') : '' }));
+  if (isNum(c.vis)) { const mi = m2mi(c.vis); b.push(T('Visibility', mi >= 10 ? '10+' : rnd(mi, mi < 3 ? 1 : 0), { i: 'eye', c: '#2fb5b5', unit: 'mi', g: bar2(Math.min(mi, 10) / 10), n: mi < 0.3 ? 'Dense fog.' : mi < 1 ? 'Fog.' : mi < 4 ? 'Mist or haze.' : 'Clear air.' })); }
   const flNow = hI >= 0 ? H.fl[hI] : null;
-  if (isNum(flNow)) x.push(Row('freeze', 'Freezing level', fFt(flNow), { c: 'var(--snow)', sub: 'Snow down to ' + fFt(Math.max(0, flNow - 300)), more: 'The height where the air drops to freezing. Snow usually reaches about 1,000 feet below it.' }));
-  fill('now-body', r);
-  fill('now-x', x);
+  if (isNum(flNow)) b.push(T('Freezing level', fFt(flNow), { i: 'snow', c: 'var(--snow)', wide: b.length % 2 === 0, g: bar2(clamp(m2ft(flNow) / 10000, 0, 1)), n: 'Snow can reach down to about ' + fFt(Math.max(0, flNow - 300)) + '.' }));
+  fill('now-body', a);
+  fill('now-x', b);
 };
 
 R.air = function () {
   const p = place(), now = S.now, tz = p.tz, aq = S.aq;
-  if (!aq || !aq.cur) { fill('air-body'); return; }
+  if (!aq || !aq.cur) { fill('air-body'); fill('air-more'); return; }
   const c = aq.cur, cat = aqiCat(c.aqi), H = aq.h, i0 = Math.max(0, hourIdx(H.t, now));
   const sub = [['Fine particles (PM2.5)', c.pm25, H.aPm25[i0], 'Smoke and exhaust. The one that matters most here.'], ['Coarse particles (PM10)', c.pm10, H.aPm10[i0], 'Dust, road grit and pollen.'], ['Ozone', c.o3, H.aO3[i0], 'Forms in sunlight on hot afternoons.'], ['Nitrogen dioxide', c.no2, H.aNo2[i0], 'Traffic exhaust.'], ['Sulfur dioxide', c.so2, H.aSo2[i0], 'Industry and shipping.'], ['Carbon monoxide', c.co, H.aCo[i0], 'Combustion.']];
   const lead = sub.filter(r => isNum(r[2])).sort((a, b) => b[2] - a[2])[0];
+  fill('air-body', T('Air quality', isNum(c.aqi) ? Math.round(c.aqi) : '–', { i: 'leaf', c: aqColor(c.aqi), wide: true, unit: cat.name.replace('Unhealthy for sensitive groups', 'Sensitive'), g: pinScale(c.aqi || 0, 300, AQI_SEGS, 'Air quality index ' + Math.round(c.aqi) + ', where 0 to 50 is good'), n: lead ? 'Mostly ' + lead[0].replace(/ \(.*/, '').toLowerCase() + '.' : '' }));
   const draw = host => {
     const cHost = h('div');
-    fill(host, h('div', { class: 'pols' }, sub.map(r => h('div', { class: 'pol' }, h('div', { class: 'pol-h' }, h('b', null, r[0]), h('span', null, isNum(r[1]) ? rnd(r[1], r[1] < 10 ? 1 : 0) + ' µg/m³' : '–'), h('span', null, 'index ' + (isNum(r[2]) ? Math.round(r[2]) : '–'))), h('div', { class: 'pol-d' }, r[3])))),
+    fill(host, h('p', { class: 'sub' }, cat.advice), h('div', { class: 'pols' }, sub.map(r => h('div', { class: 'pol' }, h('div', { class: 'pol-h' }, h('b', null, r[0]), h('span', null, isNum(r[1]) ? rnd(r[1], r[1] < 10 ? 1 : 0) + ' µg/m³' : '–'), h('span', null, 'index ' + (isNum(r[2]) ? Math.round(r[2]) : '–'))), h('div', { class: 'pol-d' }, r[3])))),
       h('div', { class: 'chart-title' }, 'Air quality index, next four days'), cHost,
       h('p', { class: 'sub' }, 'This is a regional model. For a measured reading nearby use ', ext('https://www.airnow.gov/', 'AirNow'), ' or its ', ext('https://fire.airnow.gov/', 'smoke map'), '.'));
     const ix = []; for (let i = i0; i < Math.min(H.t.length, i0 + 96); i++) ix.push(i);
@@ -2575,30 +2601,34 @@ R.air = function () {
       refs: [{ y: 50, label: 'Moderate above 50', include: false, color: 'var(--warn)', left: true }, { y: 100, label: 'Sensitive groups above 100', include: false, color: 'var(--serious)', left: true }],
       tip: k => ({ title: fDow(xs[k], tz) + ' ' + fHour(xs[k], tz), rows: [{ name: 'Index', value: isNum(vals[k]) ? Math.round(vals[k]) : '–', color: 'var(--ink-2)' }, { name: 'Category', value: aqiCat(vals[k]).name }] }) });
   };
-  fill('air-body', Row('air', 'Air quality', isNum(c.aqi) ? Math.round(c.aqi) : '–', { c: aqColor(c.aqi), sub: cat.name + (lead ? ', mostly ' + lead[0].replace(/ \(.*/, '').toLowerCase() : ''), g: pinScale(c.aqi || 0, 300, AQI_SEGS, 'Air quality index ' + Math.round(c.aqi) + ', where 0 to 50 is good'), n: cat.advice, lazy: draw }));
+  fill('air-more', lazy('Air quality: pollutants and the next four days', draw));
 };
 
 // ---------- sun, moon, season ----------
 R.light = function () {
   const p = place(), now = S.now, tz = p.tz, z = zparts(now, tz);
-  const sd = sunAt(p, now), y1 = sunOffset(p, now, -1), r = [];
+  const sd = sunAt(p, now), y1 = sunOffset(p, now, -1), t = [], m = [];
   const hasSun = !!(sd.sunrise && sd.sunset);
   const yt = yearTable(p, z.y), doy = dayOfYear(z.y, z.m, z.d), diy = daysInYear(z.y);
   if (hasSun) {
     const up = now > sd.sunrise && now < sd.sunset, nextRise = now < sd.sunrise ? sd.sunrise : sunOffset(p, now, 1).sunrise;
-    r.push(Row('sun', up ? 'Sunset' : 'Sunrise', fTime(up ? sd.sunset : nextRise, tz), { c: 'var(--sun)', sub: up ? 'Sunrise was ' + fTime(sd.sunrise, tz) : 'Sunset was ' + fTime(sd.sunset, tz),
-      g: h('div', null, sunArc(p, now), h('div', { class: 'arc-times' }, h('div', null, 'Sunrise', h('br'), h('b', null, fTime(sd.sunrise, tz))), h('div', { style: 'text-align:center' }, 'First and last light', h('br'), h('b', null, fTime(sd.dawn, tz).replace(/ [AP]M/, '') + ' and ' + fTime(sd.dusk, tz).replace(/ [AP]M/, ''))), h('div', null, 'Sunset', h('br'), h('b', null, fTime(sd.sunset, tz))))) }));
+    t.push(T(up ? 'Sunset' : 'Sunrise', fTime(up ? sd.sunset : nextRise, tz), { i: 'sunrise', c: 'var(--sun)', wide: true, g: h('div', null, sunArc(p, now), h('div', { class: 'arc-times' }, h('div', null, 'Sunrise', h('br'), h('b', null, fTime(sd.sunrise, tz))), h('div', { style: 'text-align:center' }, 'First and last light', h('br'), h('b', null, fTime(sd.dawn, tz).replace(/ [AP]M/, '') + ' and ' + fTime(sd.dusk, tz).replace(/ [AP]M/, ''))), h('div', null, 'Sunset', h('br'), h('b', null, fTime(sd.sunset, tz))))) }));
     const d1 = y1.len ? sd.len - y1.len : 0;
-    r.push(Row('daylight', 'Daylight', fDur(sd.len), { c: 'var(--sun)', sub: fDurS(d1) + (d1 < 0 ? ' less' : ' more') + ' than yesterday', g: yearCurve(yt.map(d => d.len), doy - 1, 'var(--sun)'), n: 'The curve is daylight across the whole year. The dot is today.' }));
+    t.push(T('Daylight', fDur(sd.len), { i: 'hour', c: 'var(--sun)', g: yearCurve(yt.map(d => d.len), doy - 1, 'var(--sun)'), n: trendTxt(d1 >= 0 ? 1 : -1, fDurS(d1) + ' vs yesterday', 'light') }));
     const sol = SEASON_EVENTS.find(e => e.t > now && (e.k === 'dec' || e.k === 'jun')), s2 = sol ? sunAt(p, sol.t) : null;
-    if (s2 && s2.len) { const shortest = s2.len < sd.len; r.push(Row('solstice', shortest ? 'Shortest day' : 'Longest day', String(Math.max(0, daysBetween(now, sol.t, tz))), { c: shortest ? '#5b6fd6' : 'var(--sun)', unit: 'days', sub: fMD(sol.t, tz) + ', ' + fDur(s2.len) + ' of daylight', n: fDurLoose(Math.abs(sd.len - s2.len)) + ' of daylight still to ' + (shortest ? 'lose before it turns around.' : 'gain.') })); }
-  } else r.push(Row('sun', 'Sun', '–', { sub: 'The sun does not rise and set in the usual way here today' }));
+    if (s2 && s2.len) {
+      const shortest = s2.len < sd.len, lens = yt.map(d => d.len).filter(isNum), mx = Math.max.apply(null, lens), mn = Math.min.apply(null, lens);
+      const done = shortest ? (mx - sd.len) / Math.max(1, mx - mn) : (sd.len - mn) / Math.max(1, mx - mn);
+      t.push(T(shortest ? 'Shortest day' : 'Longest day', String(Math.max(0, daysBetween(now, sol.t, tz))), { i: 'cal', c: shortest ? '#5b6fd6' : 'var(--sun)', unit: 'days', g: h('div', null, bar2(done), h('div', { class: 'pscale-lab' }, h('span', null, shortest ? 'Longest day' : 'Shortest day'), h('span', null, fMD(sol.t, tz)))), n: fDurLoose(Math.abs(sd.len - s2.len)) + ' still to ' + (shortest ? 'lose.' : 'gain.') }));
+    }
+  } else t.push(T('Sun', '–', { i: 'sunrise', wide: true, n: 'The sun does not rise and set in the usual way here today.' }));
   const mo = S.moon;
-  if (mo) r.push(Row('moon', 'Moon', Math.round(mo.frac * 100) + '%', { c: '#8a7fd0', sub: mo.name + (mo.nextFull ? ', full ' + fMD(mo.nextFull.t, tz) : ''), g: moonSvg(mo.frac, mo.waxing, 64) }));
+  if (mo) m.push(T('Moon', Math.round(mo.frac * 100) + '%', { i: 'moon', c: '#8a7fd0', side: true, g: moonSvg(mo.frac, mo.waxing, 56), n: mo.name + '.' + (mo.nextFull ? ' Full ' + fMD(mo.nextFull.t, tz) + '.' : '') }));
   const sea = seasonInfo(now, p.lat);
-  if (sea) r.push(Row('season', 'Season', sea.name, { c: /Autumn|Fall/.test(sea.name) ? '#e07a2e' : /Winter/.test(sea.name) ? '#4a8fd8' : /Spring/.test(sea.name) ? '#4fb35c' : '#e5a823', sub: plural(Math.max(0, Math.round((sea.end - now) / DAY)), 'day') + ' until ' + sea.next.toLowerCase(), g: ring(sea.frac, Math.round(sea.frac * 100) + '%'), n: Math.round(sea.frac * 100) + '% of the way through ' + sea.name.toLowerCase() + '.' }));
-  r.push(Row('year', String(z.y), 'Day ' + doy, { c: '#4fb35c', sub: plural(diy - doy, 'day') + ' left', g: bar2(doy / diy), n: Math.round(doy / diy * 100) + '% of the year is done.' }));
-  fill('light-body', r);
+  if (sea) m.push(T('Season', sea.name, { i: 'season', c: /Autumn|Fall/.test(sea.name) ? '#e07a2e' : /Winter/.test(sea.name) ? '#4a8fd8' : /Spring/.test(sea.name) ? '#4fb35c' : '#e5a823', side: true, g: ring(sea.frac, Math.round(sea.frac * 100) + '%'), n: plural(Math.max(0, Math.round((sea.end - now) / DAY)), 'day') + ' until ' + sea.next.toLowerCase() + '.' }));
+  m.push(T(String(z.y), 'Day ' + doy, { i: 'cal', c: '#4fb35c', wide: true, g: bar2(doy / diy), n: plural(diy - doy, 'day') + ' left, ' + Math.round(doy / diy * 100) + '% done.' }));
+  fill('light-body', t);
+  fill('moon-body', m);
   // dates coming up
   const ms = (S.ms || []).slice(0, 8), cards = ms.map(e => { const n = daysBetween(now, e.t, tz); return h('div', { class: 'dc', title: e.detail || '' }, h('div', { class: 'in' }, n <= 0 ? 'Today' : n + (n === 1 ? ' day' : ' days')), h('div', { class: 'lb' }, e.label), h('div', { class: 'dt' }, fDowMD(e.t, tz))); });
   nextShowers(p, now, 1).forEach(x => { const n = daysBetween(now, x.t, tz); cards.push(h('div', { class: 'dc', title: x.rate }, h('div', { class: 'in' }, n <= 0 ? 'Tonight' : n + (n === 1 ? ' day' : ' days')), h('div', { class: 'lb' }, x.name + ' meteor shower'), h('div', { class: 'dt' }, fDowMD(x.t, tz) + ', moon ' + Math.round(x.moon * 100) + '% lit'))); });
@@ -2767,10 +2797,11 @@ const sectionOff = id => S.blocked || (id === 'mountains' && !inNorthwest(place(
 function renderAll() {
   document.body.classList.toggle('blocked', !!S.blocked);
   LIVE_SECTIONS.forEach(id => $(id).classList.toggle('hidden', sectionOff(id)));
-  $('conds').classList.toggle('hidden', !!S.blocked);
+  $('stk-sky').classList.toggle('hidden', !!S.blocked);
+  if (S.blocked) fill('air-more');
   ['welcome', 'hero', 'brief', 'now', 'hours', 'plan', 'week', 'light', 'air', 'mountains', 'ahead', 'history', 'stars', 'foot'].forEach(renderOne);
 }
-const MORE = { light: 'light-more' };
+const MORE = { light: 'light-more', air: 'air-more' };
 function renderOne(name) {
   if (LIVE_SECTIONS.indexOf(name) >= 0 && sectionOff(name)) return;
   const body = $(MORE[name] || name + '-body');
@@ -3117,6 +3148,7 @@ function init() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(true); });
   setInterval(() => tick(false), 60000);
   initTabs();
+  initStacks();
   startPlace();
 }
 init();
