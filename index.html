@@ -582,10 +582,12 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .tbar i{position:absolute;top:-4px;width:6px;height:16px;border-radius:3px;background:var(--ink);box-shadow:0 0 0 2px var(--card);transform:translateX(-3px)}
 
 /* trend arrows */
-.tr{display:inline-flex;align-items:center;gap:3px;font-weight:700;white-space:nowrap}
-.tr svg{width:1.05em;height:1.05em;flex:none}
-.tr-up svg{color:#e8603a}.tr-down svg{color:#3f7fe0}.tr-flat svg{color:var(--muted)}
-.tr-sunup svg{color:var(--sun)}.tr-sundown svg{color:#5b6fd6}
+.tr{white-space:nowrap;font-weight:inherit}
+.tr .am{display:inline-block;width:.5em;height:.72em;margin-right:.08em;vertical-align:-.02em;overflow:visible}
+.tr-up .am{color:#e8603a}.tr-down .am{color:#3f7fe0}.tr-flat .am{color:var(--muted)}
+.tr-sunup .am{color:var(--sun)}.tr-sundown .am{color:#5b6fd6}
+.hero.night .tr-up .am{color:#ff9a6b}.hero.night .tr-down .am{color:#8fb6ff}
+.hero-story .sc .tr{display:inline}
 .hsep{display:inline-block;width:14px}
 .hero-story .sc-up svg{color:#e8603a}.hero-story .sc-down svg{color:#3f7fe0}
 .hero-story .sc-drop svg{color:var(--rain)}.hero-story .sc-wind svg{color:#1f9e9a}.hero-story .sc-sun svg{color:var(--sun)}
@@ -613,6 +615,13 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .stack.closed .tl .k{flex:1;font-size:14px;color:var(--ink)}
 .stack.closed .tl .v{font-size:21px;margin:0}
 @media (prefers-reduced-motion:no-preference){.stack .tl{transition:margin .18s ease,padding .18s ease}}
+
+/* day chips at the top */
+.hero-story{display:flex;flex-wrap:wrap;gap:6px;font-size:15px;font-weight:650;max-width:none}
+.hero-story .sc{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.5);border-radius:999px;padding:6px 12px 6px 9px;line-height:1.1;white-space:nowrap}
+.hero.night .hero-story .sc{background:rgba(255,255,255,.14)}
+.hero-story .sc>svg{width:17px;height:17px;flex:none}
+@media (min-width:980px){.hero-story{font-size:16px;align-self:end}}
 
 </style>
 </head>
@@ -2367,7 +2376,7 @@ R.hero = function () {
     if (isNum(c.app)) side.push(h('span', null, 'Feels like ' + fT(c.app)));
     if (di >= 0) side.push(h('span', null, 'High ' + fT(wx.d.tmax[di]) + '  Low ' + fT(wx.d.tmin[di])));
     fill('hero-main', h('div', { class: 'hero-temp' }, fT(c.temp)), h('div', { class: 'hero-cond' }, icon(iconKind(c.code, c.isDay)), side));
-    fill('hero-story', i0 >= 0 ? dayStory(wx, p, now, i0).map(x => h('span', { class: 'sc sc-' + x[0] }, storyIcon(x[0]), x[1])) : null);
+    fill('hero-story', i0 >= 0 ? dayStory(wx, p, now, i0).map(x => x[0] === 'up' || x[0] === 'down' ? h('span', { class: 'sc' }, trendTxt(x[0] === 'up' ? 1 : -1, x[1])) : h('span', { class: 'sc sc-' + x[0] }, storyIcon(x[0]), x[1])) : null);
     fill('hero-curve', i0 >= 0 ? dayCurve(wx, p, now) : null);
     if (di >= 0 && isNum(wx.d.tmax[di + 1])) chips.push(chip('Tomorrow ' + fT(wx.d.tmax[di + 1]) + ' / ' + fT(wx.d.tmin[di + 1])));
     if (S.aq && S.aq.cur && isNum(S.aq.cur.aqi) && S.aq.cur.aqi > 50) chips.push(chip('Air: ' + aqiCat(S.aq.cur.aqi).name.toLowerCase(), null, aqiCat(S.aq.cur.aqi).dot));
@@ -2539,10 +2548,13 @@ const TILE_ICON = {
 };
 const tileIcon = k => s('svg', { viewBox: '0 0 24 24', class: 'ti', 'aria-hidden': 'true' }, s('path', { d: TILE_ICON[k], fill: 'none', stroke: 'currentColor', 'stroke-width': 1.9, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
 // An up or down arrow, colored warm for rising and cool for falling, beside a number.
+function arrowMark(dir) { // a slim arrow, the size of a plus sign, standing in for + and −
+  const d = dir > 0 ? 'M6 15V2M6 2 2 6M6 2l4 4' : dir < 0 ? 'M6 1v13M6 14l-4-4M6 14l4-4' : 'M1 8h12M13 8 9 4M13 8l-4 4';
+  return s('svg', { viewBox: dir === 0 ? '0 0 14 16' : '0 0 12 16', class: 'am', 'aria-hidden': 'true' }, s('path', { d, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+}
 function trendTxt(dir, text, kind) {
-  const d = dir > 0 ? 'M12 19V5M12 5l-5 5M12 5l5 5' : dir < 0 ? 'M12 5v14M12 19l-5-5M12 19l5-5' : 'M4 12h16M20 12l-5-5M20 12l-5 5';
   const cls = kind === 'light' ? (dir > 0 ? 'tr-sunup' : 'tr-sundown') : (dir > 0 ? 'tr-up' : dir < 0 ? 'tr-down' : 'tr-flat');
-  return h('span', { class: 'tr ' + cls }, s('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }, s('path', { d, fill: 'none', stroke: 'currentColor', 'stroke-width': 2.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })), text);
+  return h('span', { class: 'tr ' + cls, 'aria-label': (dir > 0 ? 'up ' : dir < 0 ? 'down ' : '') + text }, arrowMark(dir), text);
 }
 const uvColor = u => u < 3 ? 'var(--good)' : u < 6 ? 'var(--warn)' : u < 8 ? 'var(--serious)' : 'var(--crit)';
 const aqColor = a => !isNum(a) || a <= 50 ? 'var(--good)' : a <= 100 ? 'var(--warn)' : a <= 150 ? 'var(--serious)' : 'var(--crit)';
