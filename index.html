@@ -2900,7 +2900,7 @@ function ordinal(n) { const s2 = ['th', 'st', 'nd', 'rd'], v = n % 100; return n
 
 R.foot = function () {
   const names = { wx: 'Weather forecast (Open-Meteo)', aq: 'Air quality (Open-Meteo, CAMS model)', alerts: 'Alerts (National Weather Service)', nws: 'Written forecast and nearest station (National Weather Service)', afd: 'Forecaster discussion (National Weather Service)', cpc: '6 to 14 day outlook (NOAA Climate Prediction Center)', mtn: 'Mountain forecast (Open-Meteo)', hist: 'Daily history since 1991 (Open-Meteo, ERA5)' };
-  const items = Object.keys(names).map(k => { const st = S.status[k] || {}; if (st.state === 'ok' && ((k === 'wx' && S.wx && S.wx.source === 'nws') || (k === 'mtn' && S.mtn && S.mtn.source === 'nws'))) return h('li', null, h('i', { class: 'dot warn' }), h('span', null, names[k].replace(/\(Open-Meteo\)/, '') + ': Open-Meteo did not answer, so this came from the National Weather Service ' + fAgo(st.at))); const cls = st.state === 'ok' ? 'good' : st.state === 'error' ? 'crit' : st.state === 'loading' ? 'warn' : ''; return h('li', null, h('i', { class: 'dot ' + cls }), h('span', null, names[k] + ': ' + (S.blocked ? 'not available in this copy' : st.state === 'ok' ? 'loaded ' + fAgo(st.at) : st.state === 'error' ? 'failed. ' + st.msg : st.state === 'loading' ? 'loading' : st.state === 'skip' ? 'not used for this place' : 'waiting'))); });
+  const items = Object.keys(names).map(k => { const st = S.status[k] || {}; if (st.state === 'ok' && ((k === 'wx' && S.wx && S.wx.source === 'nws') || (k === 'mtn' && S.mtn && S.mtn.source === 'nws'))) return h('li', null, h('i', { class: 'dot warn' }), h('span', null, names[k].replace(/ \(Open-Meteo\)/, '') + ': Open-Meteo did not answer, so this came from the National Weather Service ' + fAgo(st.at))); const cls = st.state === 'ok' ? 'good' : st.state === 'error' ? 'crit' : st.state === 'loading' ? 'warn' : ''; return h('li', null, h('i', { class: 'dot ' + cls }), h('span', null, names[k] + ': ' + (S.blocked ? 'not available in this copy' : st.state === 'ok' ? 'loaded ' + fAgo(st.at) : st.state === 'error' ? 'failed. ' + st.msg : st.state === 'loading' ? 'loading' : st.state === 'skip' ? 'not used for this place' : 'waiting'))); });
   fill('foot-status', items);
 };
 R.welcome = function () {
@@ -3169,7 +3169,7 @@ async function loadAll(force) {
   if (!fresh(S.wx, 10 * 60000)) run('wx', () => fetchWx(p)).then(v => {
     if (seq !== loadSeq) return;
     if (v) { S.wx = v; store.set('wx:' + p.id, v); }
-    draw(['hero', 'brief', 'now', 'hours', 'plan', 'week', 'light', 'history']);
+    draw(['hero', 'brief', 'now', 'hours', 'plan', 'week', 'light', 'history', 'foot']);
   });
   // give a blocked copy (one hosted where outside calls are refused) a moment to say so before asking for more
   await new Promise(r => setTimeout(r, 80));
