@@ -1437,18 +1437,92 @@ function normWx(j) {
     d: { t: msArr(D.time), code: D.weather_code || [], tmax: D.temperature_2m_max || [], tmin: D.temperature_2m_min || [], amax: D.apparent_temperature_max || [], amin: D.apparent_temperature_min || [], sunrise: msArr(D.sunrise), sunset: msArr(D.sunset), sunshine: D.sunshine_duration || [], uvmax: D.uv_index_max || [], psum: D.precipitation_sum || [], ssum: D.snowfall_sum || [], phours: D.precipitation_hours || [], ppmax: D.precipitation_probability_max || [], wmax: D.wind_speed_10m_max || [], gmax: D.wind_gusts_10m_max || [], wdir: D.wind_direction_10m_dominant || [] }
   };
 }
-async function fetchWx(p) {
+async function fetchWxOM(p) {
   const base = { latitude: p.lat.toFixed(4), longitude: p.lon.toFixed(4), timezone: p.tz, timeformat: 'unixtime', forecast_days: 16, past_days: 2 };
   let j;
-  try { j = await getJSON(API.wx + '?' + qs(Object.assign({}, base, { current: WX_CUR, hourly: WX_HOURLY, daily: WX_DAILY }))); }
+  try { j = await getJSON(API.wx + '?' + qs(Object.assign({}, base, { current: WX_CUR, hourly: WX_HOURLY, daily: WX_DAILY })), 9000); }
   catch (e) {
     if (e.status !== 400) throw e;
-    j = await getJSON(API.wx + '?' + qs(Object.assign({}, base, { current: WX_CUR_CORE, hourly: WX_HOURLY_CORE, daily: WX_DAILY_CORE })));
+    j = await getJSON(API.wx + '?' + qs(Object.assign({}, base, { current: WX_CUR_CORE, hourly: WX_HOURLY_CORE, daily: WX_DAILY_CORE })), 9000);
     j._reduced = e.message;
   }
   const w = normWx(j);
   if (j._reduced) w.reduced = j._reduced;
   return w;
+}
+// The main forecast comes from Open-Meteo. If it does not answer, a US place falls back to the National Weather Service's own gridded forecast.
+async function fetchWx(p) {
+  try { return await fetchWxOM(p); }
+  catch (e) {
+    if (!isUS(p)) throw e;
+    const w = await fetchWxNws(p);
+    w.source = 'nws'; w.omError = e.message;
+    return w;
+  }
+}
+
+// ---------- National Weather Service gridded forecast, reshaped to look like the Open-Meteo forecast ----------
+function isoHours(d) { const m = /P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?/.exec(d || ''); return m ? (+(m[1] || 0)) * 24 + (+(m[2] || 0)) + ((+(m[3] || 0)) >= 30 ? 1 : 0) : 1; }
+function gridSeries(prop, t0, n, spread) {
+  const out = new Array(n).fill(null);
+  ((prop && prop.values) || []).forEach(v => {
+    const parts = String(v.validTime).split('/'), s = Date.parse(parts[0]), hrs = Math.max(1, isoHours(parts[1]));
+    for (let k = 0; k < hrs; k++) { const i = Math.round((s + k * HOUR - t0) / HOUR); if (i >= 0 && i < n) out[i] = spread && isNum(v.value) ? v.value / hrs : v.value; }
+  });
+  return out;
+}
+async function fetchGrid(lat, lon, key) {
+  let gp = key ? store.get(key) : null;
+  if (!gp || !gp.grid || Date.now() - gp.at > 30 * DAY) {
+    const j = await getJSON(API.nws + '/points/' + (+lat.toFixed(4)) + ',' + (+lon.toFixed(4)));
+    gp = { at: Date.now(), grid: (j.properties || {}).forecastGridData };
+    if (!gp.grid) throw new Error('No National Weather Service grid here');
+    if (key) store.set(key, gp);
+  }
+  const g = await getJSON(gp.grid, 15000);
+  return g.properties || {};
+}
+function gridCode(wxv, pp, qpf, sky, tC) {
+  const w = (wxv && wxv[0] && wxv[0].weather) || '';
+  if (/thunder/.test(w) && isNum(pp) && pp >= 30) return 95;
+  if (isNum(pp) && pp >= 50 && (!isNum(qpf) || qpf > 0.05)) return /snow/.test(w) || (isNum(tC) && tC <= 0.5) ? 73 : /drizzle/.test(w) ? 53 : 61;
+  if (/fog/.test(w)) return 45;
+  return !isNum(sky) ? 2 : sky < 20 ? 0 : sky < 45 ? 1 : sky < 75 ? 2 : 3;
+}
+async function fetchWxNws(p) {
+  const g = await fetchGrid(p.lat, p.lon, 'pg:' + p.id);
+  const z = zparts(Date.now(), p.tz), t0 = zonedEpoch(z.y, z.m, z.d, 0, 0, p.tz) - 24 * HOUR, n = 24 * 9;
+  const ser = (k, spread) => gridSeries(g[k], t0, n, spread);
+  const t = []; for (let i = 0; i < n; i++) t.push(t0 + i * HOUR);
+  const temp = ser('temperature'), app = ser('apparentTemperature'), dew = ser('dewpoint'), rh = ser('relativeHumidity'), pp = ser('probabilityOfPrecipitation'), qpf = ser('quantitativePrecipitation', true), snow = ser('snowfallAmount', true);
+  const sky = ser('skyCover'), wind = ser('windSpeed'), gust = ser('windGust'), wdir = ser('windDirection'), vis = ser('visibility'), sl = ser('snowLevel'), wxv = ser('weather');
+  // keep only the stretch where the grid has temperatures
+  let a = temp.findIndex(isNum), b = n - 1; while (b > a && !isNum(temp[b])) b--;
+  if (a < 0) throw new Error('The National Weather Service grid had no temperatures');
+  const cut = arr => arr.slice(a, b + 1);
+  const H = { t: cut(t), temp: cut(temp), app: cut(app).map((v, i) => isNum(v) ? v : cut(temp)[i]), rh: cut(rh), dew: cut(dew), pp: cut(pp).map(v => isNum(v) ? v : 0), precip: cut(qpf).map(v => isNum(v) ? v : 0), snow: cut(snow).map(v => isNum(v) ? v / 10 : 0),
+    cloud: cut(sky), vis: cut(vis), wind: cut(wind), gust: cut(gust).map((v, i) => isNum(v) ? v : cut(wind)[i]), wdir: cut(wdir), uv: [], pmsl: [], sw: [], fl: cut(sl).map(v => isNum(v) ? v + 300 : null) };
+  H.code = H.t.map((x, i) => gridCode(cut(wxv)[i], H.pp[i], H.precip[i], H.cloud[i], H.temp[i]));
+  H.isDay = H.t.map(x => sunAlt(p, x + 30 * 60000) > -0.833 ? 1 : 0);
+  // days, midnight to midnight local time
+  const D = { t: [], code: [], tmax: [], tmin: [], amax: [], amin: [], sunrise: [], sunset: [], sunshine: [], uvmax: [], psum: [], ssum: [], phours: [], ppmax: [], wmax: [], gmax: [], wdir: [] };
+  const byDay = {};
+  H.t.forEach((x, i) => { const k = dayKey(x, p.tz); (byDay[k] = byDay[k] || []).push(i); });
+  Object.keys(byDay).forEach(k => {
+    const ix = byDay[k]; if (ix.length < 18) return;
+    const zz = zparts(H.t[ix[0]] + 12 * HOUR - (zparts(H.t[ix[0]], p.tz).h) * HOUR, p.tz), mid = zonedEpoch(zz.y, zz.m, zz.d, 0, 0, p.tz), sd = sunAt(p, mid + 12 * HOUR);
+    const vals = a => ix.map(i => a[i]).filter(isNum), day = ix.filter(i => H.isDay[i]);
+    const wet = ix.filter(i => H.pp[i] >= 50 && H.precip[i] > 0.05);
+    D.t.push(mid); D.tmax.push(maxOf(vals(H.temp))); D.tmin.push(minOf(vals(H.temp))); D.amax.push(maxOf(vals(H.app))); D.amin.push(minOf(vals(H.app)));
+    D.sunrise.push(sd.sunrise); D.sunset.push(sd.sunset); D.sunshine.push(null); D.uvmax.push(null);
+    D.psum.push(sumOf(vals(H.precip))); D.ssum.push(sumOf(vals(H.snow))); D.phours.push(ix.filter(i => H.precip[i] > 0.05).length);
+    D.ppmax.push(maxOf(vals(H.pp))); D.wmax.push(maxOf(vals(H.wind))); D.gmax.push(maxOf(vals(H.gust))); D.wdir.push(null);
+    const codes = (wet.length >= 2 ? wet : day.length ? day : ix).map(i => H.code[i]);
+    D.code.push(wet.length >= 2 ? Math.max.apply(null, codes) : Math.round(meanOf(codes.map(c => c > 3 ? 3 : c))));
+  });
+  const ic = hourIdx(H.t, Date.now()), c = Math.max(0, ic);
+  const cur = { t: H.t[c], temp: H.temp[c], app: H.app[c], rh: H.rh[c], dew: H.dew[c], isDay: H.isDay[c], precip: H.precip[c], code: H.code[c], cloud: H.cloud[c], pmsl: null, wind: H.wind[c], wdir: H.wdir[c], gust: H.gust[c], vis: H.vis[c], uv: null };
+  return { fetched: Date.now(), tz: p.tz, elev: g.elevation ? g.elevation.value : null, cur, h: H, d: D };
 }
 
 function normAq(j) {
@@ -1553,10 +1627,12 @@ async function fetchCpc(stateName) {
 async function fetchMountains(list) {
   const lat = [], lon = [], elev = [];
   for (const m of list) { lat.push(m.lat, m.lat); lon.push(m.lon, m.lon); elev.push(Math.round(ft2m(m.base)), Math.round(ft2m(m.top))); }
-  const ask = vars => getJSON(API.wx + '?' + qs({ latitude: lat.join(','), longitude: lon.join(','), elevation: elev.join(','), timezone: lat.map(() => 'America/Los_Angeles').join(','), timeformat: 'unixtime', forecast_days: 7, hourly: vars }));
+  const ask = vars => getJSON(API.wx + '?' + qs({ latitude: lat.join(','), longitude: lon.join(','), elevation: elev.join(','), timezone: lat.map(() => 'America/Los_Angeles').join(','), timeformat: 'unixtime', forecast_days: 7, hourly: vars }), 9000);
   let j;
-  try { j = await ask('temperature_2m,precipitation,freezing_level_height,wind_gusts_10m,cloud_cover,weather_code'); }
-  catch (e) { if (e.status !== 400) throw e; j = await ask('temperature_2m,precipitation,wind_gusts_10m,cloud_cover'); }
+  try {
+    try { j = await ask('temperature_2m,precipitation,freezing_level_height,wind_gusts_10m,cloud_cover,weather_code'); }
+    catch (e) { if (e.status !== 400) throw e; j = await ask('temperature_2m,precipitation,wind_gusts_10m,cloud_cover'); }
+  } catch (e) { const v = await fetchMountainsNws(list); v.source = 'nws'; return v; }
   if (!Array.isArray(j)) j = [j];
   const out = { fetched: Date.now(), by: {} };
   list.forEach((m, i) => {
@@ -1571,6 +1647,22 @@ async function fetchMountains(list) {
     }
     out.by[m.id] = { t: msArr(b.hourly.time), tBase: tb, tTop: tt, precip: t.hourly.precipitation || [], fl, gust: t.hourly.wind_gusts_10m || [], cloud: t.hourly.cloud_cover || [] };
   });
+  return out;
+}
+
+async function fetchMountainsNws(list) {
+  const out = { fetched: Date.now(), by: {} }, t0 = Math.floor(Date.now() / HOUR) * HOUR - 6 * HOUR, n = 24 * 7 + 6;
+  await Promise.all(list.map(async m => {
+    try {
+      const g = await fetchGrid(m.lat, m.lon, 'pgm:' + m.id);
+      const ge = g.elevation && isNum(g.elevation.value) ? g.elevation.value : ft2m(m.base);
+      const temp = gridSeries(g.temperature, t0, n), sl = gridSeries(g.snowLevel, t0, n), q = gridSeries(g.quantitativePrecipitation, t0, n, true);
+      const at = elev => temp.map(v => isNum(v) ? v + (ge - elev) * 0.0065 : null);
+      const t = []; for (let i = 0; i < n; i++) t.push(t0 + i * HOUR);
+      out.by[m.id] = { t, tBase: at(ft2m(m.base)), tTop: at(ft2m(m.top)), precip: q.map(v => isNum(v) ? v : 0), fl: sl.map(v => isNum(v) ? v + 300 : null), gust: gridSeries(g.windGust, t0, n), cloud: gridSeries(g.skyCover, t0, n) };
+    } catch (e) { /* one mountain missing is not fatal */ }
+  }));
+  if (!Object.keys(out.by).length) throw new Error('Neither Open-Meteo nor the National Weather Service answered');
   return out;
 }
 
@@ -2403,7 +2495,7 @@ R.hero = function () {
   } else { fill('hero-story'); fill('hero-curve'); fill('hero-main', h('div', { class: 'hero-cond' }, h('span', null, 'Loading weather…'))); }
   fill('hero-chips', chips);
   const st = S.status.wx || {};
-  fill('stamp', S.blocked ? 'Weather is not available in this copy' : S.wx ? 'Updated ' + fAgo(S.wx.fetched) + (st.state === 'loading' ? ', refreshing…' : st.state === 'error' ? '. Refresh failed, may be stale' : '') : (st.state === 'error' ? 'Weather could not load' : ''));
+  fill('stamp', S.blocked ? 'Weather is not available in this copy' : S.wx ? 'Updated ' + fAgo(S.wx.fetched) + (S.wx.source === 'nws' ? ' from the National Weather Service' : '') + (st.state === 'loading' ? ', refreshing…' : st.state === 'error' ? '. Refresh failed, may be stale' : '') : (st.state === 'error' ? 'Weather could not load' : st.state === 'loading' ? 'Loading weather…' : ''));
 };
 
 R.brief = function () {
@@ -2808,7 +2900,7 @@ function ordinal(n) { const s2 = ['th', 'st', 'nd', 'rd'], v = n % 100; return n
 
 R.foot = function () {
   const names = { wx: 'Weather forecast (Open-Meteo)', aq: 'Air quality (Open-Meteo, CAMS model)', alerts: 'Alerts (National Weather Service)', nws: 'Written forecast and nearest station (National Weather Service)', afd: 'Forecaster discussion (National Weather Service)', cpc: '6 to 14 day outlook (NOAA Climate Prediction Center)', mtn: 'Mountain forecast (Open-Meteo)', hist: 'Daily history since 1991 (Open-Meteo, ERA5)' };
-  const items = Object.keys(names).map(k => { const st = S.status[k] || {}; const cls = st.state === 'ok' ? 'good' : st.state === 'error' ? 'crit' : st.state === 'loading' ? 'warn' : ''; return h('li', null, h('i', { class: 'dot ' + cls }), h('span', null, names[k] + ': ' + (S.blocked ? 'not available in this copy' : st.state === 'ok' ? 'loaded ' + fAgo(st.at) : st.state === 'error' ? 'failed. ' + st.msg : st.state === 'loading' ? 'loading' : st.state === 'skip' ? 'not used for this place' : 'waiting'))); });
+  const items = Object.keys(names).map(k => { const st = S.status[k] || {}; if (st.state === 'ok' && ((k === 'wx' && S.wx && S.wx.source === 'nws') || (k === 'mtn' && S.mtn && S.mtn.source === 'nws'))) return h('li', null, h('i', { class: 'dot warn' }), h('span', null, names[k].replace(/\(Open-Meteo\)/, '') + ': Open-Meteo did not answer, so this came from the National Weather Service ' + fAgo(st.at))); const cls = st.state === 'ok' ? 'good' : st.state === 'error' ? 'crit' : st.state === 'loading' ? 'warn' : ''; return h('li', null, h('i', { class: 'dot ' + cls }), h('span', null, names[k] + ': ' + (S.blocked ? 'not available in this copy' : st.state === 'ok' ? 'loaded ' + fAgo(st.at) : st.state === 'error' ? 'failed. ' + st.msg : st.state === 'loading' ? 'loading' : st.state === 'skip' ? 'not used for this place' : 'waiting'))); });
   fill('foot-status', items);
 };
 R.welcome = function () {
@@ -3097,7 +3189,7 @@ function startPlace() {
   S.wx = S.aq = S.alerts = S.nwsFc = S.obs = S.afd = S.cpc = S.hist = null; S.plan = null; S.histFor = null; S.status = {};
   S.now = Date.now();
   const cw = store.get('wx:' + p.id), ca = store.get('aq:' + p.id);
-  if (cw && Date.now() - cw.fetched < 12 * HOUR) S.wx = cw;
+  if (cw && Date.now() - cw.fetched < 48 * HOUR) S.wx = cw;
   if (ca && Date.now() - ca.fetched < 12 * HOUR) S.aq = ca;
   computeAstro();
   renderAll();
@@ -3112,7 +3204,7 @@ function addPlace(r) {
 function removePlace(id) {
   if (S.places.length < 2) return;
   S.places = S.places.filter(p => p.id !== id); savePlaces();
-  ['wx:', 'aq:', 'pt:', 'st:', 'hb:', 'hc:'].forEach(k => store.del(k + id));
+  ['wx:', 'aq:', 'pt:', 'pg:', 'st:', 'hb:', 'hc:'].forEach(k => store.del(k + id));
   if (S.placeId === id) setPlace(S.places[0].id);
 }
 
@@ -3145,7 +3237,7 @@ function useHere() {
   navigator.geolocation.getCurrentPosition(pos => {
     const r = { id: 'here', name: 'Current location', admin1: '', country: '', lat: pos.coords.latitude, lon: pos.coords.longitude, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' };
     S.places = S.places.filter(p => p.id !== 'here'); S.places.push(r); savePlaces();
-    ['wx:', 'aq:', 'pt:', 'st:', 'hb:', 'hc:'].forEach(k => store.del(k + 'here'));
+    ['wx:', 'aq:', 'pt:', 'pg:', 'st:', 'hb:', 'hc:'].forEach(k => store.del(k + 'here'));
     closeSheet(); setPlace('here');
   }, () => renderSheet(null, 'Location was not shared. Search for the town instead.'), { timeout: 12000, maximumAge: 600000 });
 }
