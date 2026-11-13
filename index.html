@@ -296,6 +296,7 @@ main.wrap{display:flex;flex-direction:column;gap:12px;padding-bottom:28px}
 .hero-cond .icon{width:52px;height:52px;color:inherit;margin-bottom:2px}
 .hero-cond b{font-size:22px;font-weight:780;font-stretch:108%;line-height:1.1}
 .hero-cond span{opacity:.86}
+.hero-cond .seen{font-size:13px;font-weight:650;opacity:.7;margin-top:-1px}
 .hero-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
 .hero-chips .chip{background:rgba(255,255,255,.5);border-color:transparent;color:inherit;font-size:14px;padding:5px 11px;font-weight:550}
 .hero-chips .chip b{color:inherit}
@@ -1450,15 +1451,44 @@ async function fetchWxOM(p) {
   if (j._reduced) w.reduced = j._reduced;
   return w;
 }
-// The main forecast comes from Open-Meteo. If it does not answer, a US place falls back to the National Weather Service's own gridded forecast.
+// In the US the forecast is the National Weather Service's: its forecasters edit a blend of every major model, and its chance of rain is calibrated.
+// Open-Meteo runs alongside for UV, pressure and the days past the Weather Service's week. If either one does not answer, the other carries on alone.
+const within = (pr, ms, msg) => Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))]);
 async function fetchWx(p) {
-  try { return await fetchWxOM(p); }
-  catch (e) {
-    if (!isUS(p)) throw e;
-    const w = await fetchWxNws(p);
-    w.source = 'nws'; w.omError = e.message;
-    return w;
-  }
+  if (!isUS(p)) return fetchWxOM(p);
+  const [om, nw] = await Promise.allSettled([fetchWxOM(p), within(fetchWxNws(p), 14000, 'The National Weather Service did not answer in time')]);
+  if (om.status === 'fulfilled' && nw.status === 'fulfilled') { const w = mergeWx(nw.value, om.value); w.source = 'nws'; return w; }
+  if (nw.status === 'fulfilled') { const w = nw.value; w.source = 'nws-only'; w.omError = om.reason.message; return w; }
+  if (om.status === 'fulfilled') { const w = om.value; w.source = 'om'; w.nwsError = nw.reason.message; return w; }
+  throw om.reason;
+}
+// The Weather Service's hours laid over Open-Meteo's, then the days it covers worked out again from those hours.
+const NWS_KEYS = ['temp', 'app', 'rh', 'dew', 'pp', 'precip', 'snow', 'code', 'cloud', 'vis', 'wind', 'gust', 'wdir'];
+function mergeWx(nw, om) {
+  const H = om.h, N = nw.h, pos = new Map();
+  N.t.forEach((t, i) => pos.set(t, i));
+  const from = H.t.map(t => { const j = pos.get(t); return j != null && isNum(N.temp[j]) ? j : -1; });
+  const out = { t: H.t };
+  Object.keys(H).forEach(k => {
+    if (k === 't') return;
+    out[k] = NWS_KEYS.indexOf(k) >= 0 ? H.t.map((t, i) => { const j = from[i]; return j >= 0 && N[k][j] != null ? N[k][j] : H[k][i]; }) : H[k];
+  });
+  if (!(H.fl || []).some(isNum)) out.fl = H.t.map((t, i) => from[i] >= 0 ? N.fl[from[i]] : null);
+  const DK = ['code', 'tmax', 'tmin', 'amax', 'amin', 'psum', 'ssum', 'phours', 'ppmax', 'wmax', 'gmax'], D = Object.assign({}, om.d);
+  DK.forEach(k => { D[k] = (om.d[k] || []).slice(); });
+  om.d.t.forEach((d0, k) => {
+    const d1 = om.d.t[k + 1] || d0 + DAY, ix = []; let fromN = 0;
+    out.t.forEach((t, i) => { if (t >= d0 && t < d1) { ix.push(i); if (from[i] >= 0) fromN++; } });
+    if (fromN < 12 || ix.length < 20) return;
+    const v = dayFromHours(out, ix);
+    DK.forEach(q => { D[q][k] = v[q]; });
+  });
+  const ic = hourIdx(out.t, Date.now()), j = ic >= 0 ? from[ic] : -1;
+  const cur = Object.assign({}, om.cur || nw.cur);
+  if (j >= 0) ['temp', 'app', 'rh', 'dew', 'precip', 'code', 'cloud', 'wind', 'wdir', 'gust', 'vis'].forEach(k => { if (N[k][j] != null) cur[k] = N[k][j]; });
+  const w = { fetched: Date.now(), tz: om.tz, elev: om.elev, cur, h: out, d: D, nwsUpdated: nw.updated };
+  if (om.reduced) w.reduced = om.reduced;
+  return w;
 }
 
 // ---------- National Weather Service gridded forecast, reshaped to look like the Open-Meteo forecast ----------
@@ -1491,6 +1521,9 @@ function gridCode(wxv, pp, qpf, sky, tC) {
 }
 async function fetchWxNws(p) {
   const g = await fetchGrid(p.lat, p.lon, 'pg:' + p.id);
+  // the Weather Service sometimes serves a grid that stopped updating; an old one is worse than none
+  const updated = Date.parse(g.updateTime) || null;
+  if (updated && Date.now() - updated > 12 * HOUR) throw new Error('The National Weather Service grid is ' + Math.round((Date.now() - updated) / HOUR) + ' hours old');
   const z = zparts(Date.now(), p.tz), t0 = zonedEpoch(z.y, z.m, z.d, 0, 0, p.tz) - 24 * HOUR, n = 24 * 9;
   const ser = (k, spread) => gridSeries(g[k], t0, n, spread);
   const t = []; for (let i = 0; i < n; i++) t.push(t0 + i * HOUR);
@@ -1509,20 +1542,25 @@ async function fetchWxNws(p) {
   const byDay = {};
   H.t.forEach((x, i) => { const k = dayKey(x, p.tz); (byDay[k] = byDay[k] || []).push(i); });
   Object.keys(byDay).forEach(k => {
-    const ix = byDay[k]; if (ix.length < 18) return;
+    // the grid starts when it was issued, so today may be missing its early hours; keep today anyway
+    const ix = byDay[k]; if (ix.length < 18 && !(k === dayKey(Date.now(), p.tz) && ix.length >= 3)) return;
     const zz = zparts(H.t[ix[0]] + 12 * HOUR - (zparts(H.t[ix[0]], p.tz).h) * HOUR, p.tz), mid = zonedEpoch(zz.y, zz.m, zz.d, 0, 0, p.tz), sd = sunAt(p, mid + 12 * HOUR);
-    const vals = a => ix.map(i => a[i]).filter(isNum), day = ix.filter(i => H.isDay[i]);
-    const wet = ix.filter(i => H.pp[i] >= 50 && H.precip[i] > 0.05);
-    D.t.push(mid); D.tmax.push(maxOf(vals(H.temp))); D.tmin.push(minOf(vals(H.temp))); D.amax.push(maxOf(vals(H.app))); D.amin.push(minOf(vals(H.app)));
-    D.sunrise.push(sd.sunrise); D.sunset.push(sd.sunset); D.sunshine.push(null); D.uvmax.push(null);
-    D.psum.push(sumOf(vals(H.precip))); D.ssum.push(sumOf(vals(H.snow))); D.phours.push(ix.filter(i => H.precip[i] > 0.05).length);
-    D.ppmax.push(maxOf(vals(H.pp))); D.wmax.push(maxOf(vals(H.wind))); D.gmax.push(maxOf(vals(H.gust))); D.wdir.push(null);
-    const codes = (wet.length >= 2 ? wet : day.length ? day : ix).map(i => H.code[i]);
-    D.code.push(wet.length >= 2 ? Math.max.apply(null, codes) : Math.round(meanOf(codes.map(c => c > 3 ? 3 : c))));
+    const v = dayFromHours(H, ix);
+    D.t.push(mid); D.sunrise.push(sd.sunrise); D.sunset.push(sd.sunset); D.sunshine.push(null); D.uvmax.push(null); D.wdir.push(null);
+    ['code', 'tmax', 'tmin', 'amax', 'amin', 'psum', 'ssum', 'phours', 'ppmax', 'wmax', 'gmax'].forEach(q => D[q].push(v[q]));
   });
   const ic = hourIdx(H.t, Date.now()), c = Math.max(0, ic);
   const cur = { t: H.t[c], temp: H.temp[c], app: H.app[c], rh: H.rh[c], dew: H.dew[c], isDay: H.isDay[c], precip: H.precip[c], code: H.code[c], cloud: H.cloud[c], pmsl: null, wind: H.wind[c], wdir: H.wdir[c], gust: H.gust[c], vis: H.vis[c], uv: null };
-  return { fetched: Date.now(), tz: p.tz, elev: g.elevation ? g.elevation.value : null, cur, h: H, d: D };
+  return { fetched: Date.now(), tz: p.tz, elev: g.elevation ? g.elevation.value : null, cur, h: H, d: D, updated };
+}
+// One day's figures from its hours.
+function dayFromHours(H, ix) {
+  const vals = a => ix.map(i => a[i]).filter(isNum), day = ix.filter(i => H.isDay[i]);
+  const wet = ix.filter(i => H.pp[i] >= 50 && H.precip[i] > 0.05);
+  const codes = (wet.length >= 2 ? wet : day.length ? day : ix).map(i => H.code[i]).filter(isNum);
+  return { tmax: maxOf(vals(H.temp)), tmin: minOf(vals(H.temp)), amax: maxOf(vals(H.app)), amin: minOf(vals(H.app)), psum: sumOf(vals(H.precip)), ssum: sumOf(vals(H.snow)),
+    phours: ix.filter(i => H.precip[i] > 0.05).length, ppmax: maxOf(vals(H.pp)), wmax: maxOf(vals(H.wind)), gmax: maxOf(vals(H.gust)),
+    code: wet.length >= 2 ? Math.max.apply(null, codes) : Math.round(meanOf(codes.map(c => c > 3 ? 3 : c))) };
 }
 
 function normAq(j) {
@@ -1563,17 +1601,18 @@ async function fetchNwsForecast(pt) {
 }
 async function fetchObs(pt, p) {
   let st = store.get('st:' + p.id);
-  if (!st || Date.now() - st.at > 30 * DAY) {
+  if (!st || !('lat' in st) || Date.now() - st.at > 30 * DAY) {
     const j = await getJSON(pt.stations);
     const f = (j.features || [])[0];
     if (!f) throw new Error('No reporting station nearby');
-    st = { at: Date.now(), id: f.properties.stationIdentifier, name: f.properties.name };
+    const c = (f.geometry && f.geometry.coordinates) || [];
+    st = { at: Date.now(), id: f.properties.stationIdentifier, name: f.properties.name, lat: isNum(c[1]) ? c[1] : null, lon: isNum(c[0]) ? c[0] : null };
     store.set('st:' + p.id, st);
   }
   const o = await getJSON(API.nws + '/stations/' + st.id + '/observations/latest');
   const q = o.properties || {};
   const v = x => (x && isNum(x.value)) ? x.value : null;
-  return { fetched: Date.now(), station: st.name, id: st.id, t: Date.parse(q.timestamp) || null, text: q.textDescription || '', temp: v(q.temperature), dew: v(q.dewpoint), wind: v(q.windSpeed), gust: v(q.windGust), wdir: v(q.windDirection), rh: v(q.relativeHumidity) };
+  return { fetched: Date.now(), station: st.name, id: st.id, lat: st.lat, lon: st.lon, t: Date.parse(q.timestamp) || null, text: q.textDescription || '', temp: v(q.temperature), dew: v(q.dewpoint), wind: v(q.windSpeed), gust: v(q.windGust), wdir: v(q.windDirection), rh: v(q.relativeHumidity) };
 }
 async function latestProduct(type, loc) {
   const list = await getJSON(API.nws + '/products/types/' + type + '/locations/' + loc);
@@ -1621,6 +1660,61 @@ async function fetchCpc(stateName) {
     pr = { issued: Date.parse(prod.issuanceTime) || null, text: prod.productText || '' };
   }
   return { fetched: Date.now(), issued: pr.issued, state: stateName, calls: parseCpc(pr.text, stateName) };
+}
+
+// ---------- radar: what is falling right now, read off the national radar picture ----------
+// The NEXRAD mosaic served by Iowa State University's mesonet. Each pixel's colour stands for a reflectivity (dBZ), so reading
+// the few pixels over the place answers "is it raining here" from a measurement, every five minutes, about a kilometre across.
+const RADAR = { tile: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913', meta: 'https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json', z: 8, ago: [0, 5, 10, 20, 30] };
+// the mosaic's colour for each whole dBZ from -32 to 65 (the published N0Q colour table), flattened as r, g, b
+const N0Q = [133,113,143, 134,115,141, 135,118,139, 137,121,135, 138,123,133, 139,126,132, 141,129,128, 142,131,126, 143,133,124, 145,136,121,
+  146,139,119, 150,145,83, 155,151,91, 160,157,100, 165,163,109, 170,169,118, 176,175,126, 183,184,140, 189,190,148, 194,196,157,
+  199,202,166, 204,208,175, 207,210,180, 198,201,180, 192,196,180, 185,190,180, 179,185,180, 173,179,180, 164,171,180, 157,165,180,
+  151,160,180, 145,154,180, 144,152,180, 136,146,178, 124,137,175, 116,131,172, 108,125,170, 99,118,168, 91,112,166, 79,103,162,
+  71,97,160, 65,91,158, 69,104,166, 74,118,174, 79,132,182, 86,153,195, 91,166,203, 96,180,212, 101,194,220, 106,208,228,
+  104,214,215, 82,214,162, 67,214,126, 53,214,91, 17,209,23, 16,200,22, 15,188,21, 14,179,20, 14,171,19, 13,162,18,
+  12,153,17, 12,145,16, 11,132,14, 10,124,13, 9,115,12, 9,107,11, 8,98,10, 50,115,8, 91,136,7, 132,157,6,
+  173,178,5, 214,199,4, 255,226,0, 255,211,0, 255,201,0, 255,192,0, 255,182,0, 255,172,0, 255,162,0, 255,148,0,
+  255,138,0, 255,128,0, 248,0,0, 234,0,0, 213,0,0, 198,0,0, 184,0,0, 170,0,0, 155,0,0, 141,0,0,
+  120,0,0, 255,255,255, 255,234,255, 255,212,255, 255,190,255, 255,157,255, 255,117,255, 249,96,250];
+function dbzOf(r, g, b) { let best = 0, bd = 1e9; for (let k = 0; k < N0Q.length; k += 3) { const d = (r - N0Q[k]) ** 2 + (g - N0Q[k + 1]) ** 2 + (b - N0Q[k + 2]) ** 2; if (d < bd) { bd = d; best = k / 3; } } return best - 32; }
+function tileAt(lat, lon, z) {
+  const n = 2 ** z, fx = (lon + 180) / 360 * n, sn = Math.sin(lat * Math.PI / 180), fy = (0.5 - Math.log((1 + sn) / (1 - sn)) / (4 * Math.PI)) * n;
+  const x = Math.floor(fx), y = Math.floor(fy);
+  return { x, y, px: Math.floor((fx - x) * 256), py: Math.floor((fy - y) * 256) };
+}
+function readTile(url) {
+  return new Promise((res, rej) => {
+    const im = new Image();
+    im.crossOrigin = 'anonymous';
+    const to = setTimeout(() => { im.onload = im.onerror = null; rej(new Error('The radar picture timed out')); }, 10000);
+    im.onload = () => {
+      clearTimeout(to);
+      try { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(im, 0, 0, 256, 256); res(g.getImageData(0, 0, 256, 256).data); }
+      catch (e) { rej(new Error('The radar picture could not be read')); }
+    };
+    im.onerror = () => { clearTimeout(to); rej(new Error('The radar picture did not load')); };
+    im.src = url;
+  });
+}
+// the middle value of the nine pixels around the spot, about a kilometre across; no echo counts as dry
+function spotDbz(d, at) {
+  const px = clamp(at.px, 1, 254), py = clamp(at.py, 1, 254), v = [];
+  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const k = ((py + j) * 256 + px + i) * 4; v.push(d[k + 3] > 0 ? dbzOf(d[k], d[k + 1], d[k + 2]) : -40); }
+  v.sort((a, b) => a - b);
+  return v[4];
+}
+// Now and the last half hour over the place. Also the spot over the nearest station, so a station reporting rain the radar cannot see can be believed.
+async function fetchRadar(p, stn) {
+  let valid = null;
+  try { const m = await getJSON(RADAR.meta + '?_=' + Math.floor(Date.now() / 60000), 6000); valid = Date.parse((m.meta || {}).valid) || null; } catch (e) { /* only the picture's time is lost */ }
+  const bust = Math.floor(Date.now() / 120000), here = tileAt(p.lat, p.lon, RADAR.z), tiles = {};
+  const get = (at, ago) => { const u = RADAR.tile + (ago ? '-m' + pad2(ago) + 'm' : '') + '/' + RADAR.z + '/' + at.x + '/' + at.y + '.png?_=' + bust; return tiles[u] || (tiles[u] = readTile(u)); };
+  const past = await Promise.all(RADAR.ago.map(a => get(here, a).then(d => spotDbz(d, here), () => null)));
+  if (past[0] == null) throw new Error('The radar picture did not load');
+  let stnDbz = null;
+  if (stn && isNum(stn.lat) && isNum(stn.lon)) { const sa = tileAt(stn.lat, stn.lon, RADAR.z); try { stnDbz = spotDbz(await get(sa, 0), sa); } catch (e) { /* the cross-check is optional */ } }
+  return { fetched: Date.now(), valid: valid || Date.now() - 6 * 60000, timed: !!valid, dbz: past[0], past: RADAR.ago.map((a, k) => ({ ago: a, dbz: past[k] })), stnDbz };
 }
 
 // ---------- mountains: one request, two elevations per mountain ----------
@@ -1789,16 +1883,64 @@ function pressureTrend(wx, i) {
   return { d, word, meaning };
 }
 const isWetHour = (h, i) => (isNum(h.pp[i]) && h.pp[i] >= 50) || (isNum(h.precip[i]) && h.precip[i] >= 0.3);
-function rainChange(wx, i0) {
+// When rain starts or eases. `seen` is what radar or a station measured right now (true, false or null for no measurement); it beats the forecast for the present hour.
+function rainChange(wx, i0, seen) {
   const h = wx.h, end = Math.min(h.t.length - 1, i0 + 36);
-  const nowWet = isWetHour(h, i0) || (wx.cur && isNum(wx.cur.precip) && wx.cur.precip >= 0.2);
+  const fcWet = isWetHour(h, i0) || (wx.cur && isNum(wx.cur.precip) && wx.cur.precip >= 0.2);
+  const nowWet = seen === true || seen === false ? seen : fcWet;
   if (!nowWet) {
     for (let j = i0 + 1; j <= end; j++) if (isWetHour(h, j)) return { nowWet, startsAt: h.t[j] };
     return { nowWet, startsAt: null };
   }
+  // raining, but the forecast had this hour dry: it cannot say when this rain ends
+  if (!fcWet) return { nowWet, easesAt: null, unforecast: true };
   for (let j = i0 + 1; j <= end - 2; j++) if (!isWetHour(h, j) && !isWetHour(h, j + 1) && !isWetHour(h, j + 2)) return { nowWet, easesAt: h.t[j] };
   return { nowWet, easesAt: null };
 }
+
+// ---------- rain right now, measured ----------
+// Radar over the place comes first. The nearest station counts when there is no fresh radar, or when the radar is dry over the station
+// while the station reports rain, which means the rain is too shallow for the radar beam to see.
+const RAIN_DBZ = 10, WET_TEXT = /rain|drizzle|shower|snow|sleet|hail|thunder|ice pellets|precipitation/i;
+function rainWordDbz(dbz, cold) {
+  if (cold) return dbz >= 35 ? 'Heavy snow' : dbz >= 25 ? 'Snow' : dbz >= 18 ? 'Light snow' : 'Flurries';
+  return dbz >= 50 ? 'Downpour' : dbz >= 40 ? 'Heavy rain' : dbz >= 30 ? 'Steady rain' : dbz >= 20 ? 'Light rain' : 'Drizzle';
+}
+function rainWordText(t) {
+  const parts = String(t).split(/ and |,/i), s2 = (parts.find(x => WET_TEXT.test(x)) || parts[0]).trim().toLowerCase();
+  return !s2 || /unknown|precipitation/.test(s2) ? 'Rain' : s2.charAt(0).toUpperCase() + s2.slice(1);
+}
+const rainShortWord = w => /downpour/i.test(w) ? 'Pouring' : /drizzle/i.test(w) ? 'Drizzle' : /flurr/i.test(w) ? 'Flurries' : /heavy/i.test(w) ? 'Heavy' : /light/i.test(w) ? 'Light' : 'Steady';
+function rainCode(w) {
+  if (/thunder/i.test(w)) return 95;
+  if (/snow|flurr|sleet/i.test(w)) return /heavy/i.test(w) ? 75 : /light|flurr/i.test(w) ? 71 : 73;
+  if (/drizzle/i.test(w)) return 53;
+  return /heavy|downpour/i.test(w) ? 65 : /light/i.test(w) ? 61 : 63;
+}
+const stationShort = n => String(n || 'the nearest station').split(',').pop().trim().replace(/ International Airport$/i, ' Airport').replace(/^Seattle-Tacoma Airport$/i, 'Sea-Tac');
+function rainNow(S, now) {
+  const r = S.radar, o = S.obs;
+  const rFresh = !!(r && now - r.valid < 25 * 60000), oFresh = !!(o && o.t && now - o.t < 75 * 60000);
+  const oWet = oFresh && WET_TEXT.test(o.text || '');
+  const tC = S.wx && S.wx.cur ? S.wx.cur.temp : null, cold = isNum(tC) && tC <= 1;
+  const minsAgo = a => Math.round((now - r.valid) / 60000) + a;
+  if (rFresh && r.dbz >= RAIN_DBZ) {
+    const dry = r.past.find(f => f.ago > 0 && f.dbz != null && f.dbz < RAIN_DBZ);
+    const word = rainWordDbz(r.dbz, cold);
+    return { wet: true, src: 'radar', at: r.valid, word, short: rainShortWord(word), code: rainCode(word), startedMins: dry ? minsAgo(dry.ago) : null };
+  }
+  if (oWet && (!rFresh || (isNum(r.stnDbz) && r.stnDbz < RAIN_DBZ))) {
+    const word = rainWordText(o.text);
+    return { wet: true, src: 'station', at: o.t, station: stationShort(o.station), word, short: rainShortWord(word), code: rainCode(word) };
+  }
+  if (rFresh) {
+    const wet = r.past.find(f => f.ago > 0 && f.dbz != null && f.dbz >= RAIN_DBZ);
+    return { wet: false, src: 'radar', at: r.valid, stoppedMins: wet ? minsAgo(wet.ago) : null };
+  }
+  return null;
+}
+const seenWet = rn => rn ? rn.wet : null;
+const seenWhere = rn => rn.src === 'radar' ? 'On radar ' + fAgo(rn.at) : 'At ' + rn.station + ' ' + fAgo(rn.at);
 // driest three daylight hours of a day, warmest as the tie-breaker
 function bestWindow(wx, di, p, fromMs) {
   const sr = wx.d.sunrise[di], ss = wx.d.sunset[di];
@@ -2393,10 +2535,12 @@ function lazy(label, draw, cls) {
   d.addEventListener('toggle', () => { if (d.open) draw(host); });
   return d;
 }
-function rainLine(wx, i0, now, tz) {
-  const rc = rainChange(wx, i0);
+function rainLine(wx, i0, now, tz, rn) {
+  const rc = rainChange(wx, i0, seenWet(rn));
+  if (rc.unforecast) return 'Raining now, which the forecast did not have';
   if (rc.nowWet) return rc.easesAt ? 'Rain eases about ' + fHour(rc.easesAt, tz) + (relDay(rc.easesAt, now, tz) === 'today' ? '' : ' ' + relDay(rc.easesAt, now, tz)) : 'Rain through the next day';
-  return rc.startsAt ? 'Dry until about ' + fHour(rc.startsAt, tz) + (relDay(rc.startsAt, now, tz) === 'today' ? '' : ' ' + relDay(rc.startsAt, now, tz)) : 'Dry for the next 36 hours';
+  const lead = rn && rn.stoppedMins != null ? 'Rain stopped in the last ' + rn.stoppedMins + ' min. ' : '';
+  return lead + (rc.startsAt ? 'Dry until about ' + fHour(rc.startsAt, tz) + (relDay(rc.startsAt, now, tz) === 'today' ? '' : ' ' + relDay(rc.startsAt, now, tz)) : 'Dry for the next 36 hours');
 }
 
 // The day in a sentence or two: what the temperature, sky, rain and wind are going to do, stated as facts.
@@ -2410,12 +2554,14 @@ const STORY_ICON = {
 };
 const storyIcon = k => s('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }, s('path', { d: STORY_ICON[k], fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
 function whenShort(ms, now, tz) { const r = relDay(ms, now, tz); return (r === 'today' ? '' : r === 'tomorrow' ? 'tomorrow ' : r + ' ') + fHour(ms, tz); }
-function rainShort(wx, i0, now, tz) {
-  const rc = rainChange(wx, i0);
+function rainShort(wx, i0, now, tz, rn) {
+  const rc = rainChange(wx, i0, seenWet(rn));
+  if (rc.unforecast) return ['drop', 'Raining now'];
   if (rc.nowWet) return rc.easesAt ? ['drop', 'Rain eases ' + whenShort(rc.easesAt, now, tz)] : ['drop', 'Rain all day'];
-  return rc.startsAt ? ['drop', 'Rain ' + whenShort(rc.startsAt, now, tz)] : ['dry', 'Dry 36 hrs'];
+  if (rc.startsAt) return ['drop', 'Rain ' + whenShort(rc.startsAt, now, tz)];
+  return rn && rn.stoppedMins != null ? ['dry', 'Rain stopped ' + rn.stoppedMins + ' min ago'] : ['dry', 'Dry 36 hrs'];
 }
-function dayStory(wx, p, now, i0) {
+function dayStory(wx, p, now, i0, rn) {
   const tz = p.tz, H = wx.h, z = zparts(now, tz), out = [], F = i => Math.round(cToF(H.temp[i]));
   const nx = addDays(z.y, z.m, z.d, 1), endToday = hourIdx(H.t, zonedEpoch(nx[0], nx[1], nx[2], 0, 0, tz) - HOUR);
   const today = []; for (let i = i0; i <= endToday && i < H.t.length; i++) today.push(i);
@@ -2429,14 +2575,14 @@ function dayStory(wx, p, now, i0) {
     if (peakI > i0 && F(peakI) - nowF >= 3) out.push(['up', (F(peakI) - nowF) + '° to ' + F(peakI) + '° by ' + fHour(H.t[peakI], tz)]);
     else if (nowF - F(eveI) >= 3) out.push(['down', (nowF - F(eveI)) + '° to ' + F(eveI) + '° by ' + fHour(H.t[eveI], tz)]);
     else out.push(['flat', 'Steady near ' + nowF + '°']);
-    const c0 = H.cloud[i0], wetNow = isNum(H.pp[i0]) && H.pp[i0] >= 50;
+    const c0 = H.cloud[i0], wetNow = rn ? rn.wet : isNum(H.pp[i0]) && H.pp[i0] >= 50;
     if (!wetNow && isNum(c0)) {
       const clearI = today.find(i => i > i0 && H.cloud[i] <= 35 && H.isDay[i] === 1), cloudI = today.find(i => i > i0 && H.cloud[i] >= 70);
       if (c0 >= 70 && clearI != null) out.push(['sun', 'Clears ' + fHour(H.t[clearI], tz)]);
       else if (c0 <= 35 && cloudI != null) out.push(['cloud', 'Clouds ' + fHour(H.t[cloudI], tz)]);
     }
   }
-  out.push(rainShort(wx, i0, now, tz));
+  out.push(rainShort(wx, i0, now, tz, rn));
   const span = today.length >= 3 ? today : (() => { const a = []; for (let i = i0; i < Math.min(H.t.length, i0 + 12); i++) a.push(i); return a; })();
   const gI = span.reduce((b, i) => H.gust[i] > H.gust[b] ? i : b, i0);
   if (isNum(H.gust[gI]) && kmh2mph(H.gust[gI]) >= 25) out.push(['wind', 'Gusts ' + fMph(H.gust[gI]) + ' mph ' + fHour(H.t[gI], tz)]);
@@ -2479,12 +2625,17 @@ R.hero = function () {
   fill('hero-date', fLongDate(now, tz));
   const sd = sunAt(p, now), chips = [];
   if (wx && wx.cur) {
-    const c = wx.cur, di = dayIdx(wx, now, tz), i0 = hourIdx(wx.h.t, now);
-    const side = [h('b', null, condText(c.code))];
+    const c = wx.cur, di = dayIdx(wx, now, tz), i0 = hourIdx(wx.h.t, now), rn = rainNow(S, now);
+    // what is falling right now is measured when it can be: radar or the nearest station overrule the forecast for the present
+    let code = c.code, cond = condText(c.code), seen = null;
+    if (rn && rn.wet) { code = rn.code; cond = rn.word; seen = seenWhere(rn); }
+    else if (rn && code >= 51) { code = isNum(c.cloud) && c.cloud < 70 ? 2 : 3; cond = condText(code); seen = 'No rain on radar'; }
+    const side = [h('b', null, cond)];
+    if (seen) side.push(h('span', { class: 'seen' }, seen));
     if (isNum(c.app)) side.push(h('span', null, 'Feels like ' + fT(c.app)));
     if (di >= 0) side.push(h('span', null, 'High ' + fT(wx.d.tmax[di]) + '  Low ' + fT(wx.d.tmin[di])));
-    fill('hero-main', h('div', { class: 'hero-temp' }, fT(c.temp)), h('div', { class: 'hero-cond' }, icon(iconKind(c.code, c.isDay)), side));
-    fill('hero-story', i0 >= 0 ? dayStory(wx, p, now, i0).map(x => x[0] === 'up' || x[0] === 'down' ? h('span', { class: 'sc' }, trendTxt(x[0] === 'up' ? 1 : -1, x[1])) : h('span', { class: 'sc sc-' + x[0] }, storyIcon(x[0]), x[1])) : null);
+    fill('hero-main', h('div', { class: 'hero-temp' }, fT(c.temp)), h('div', { class: 'hero-cond' }, icon(iconKind(code, c.isDay)), side));
+    fill('hero-story', i0 >= 0 ? dayStory(wx, p, now, i0, rn).map(x => x[0] === 'up' || x[0] === 'down' ? h('span', { class: 'sc' }, trendTxt(x[0] === 'up' ? 1 : -1, x[1])) : h('span', { class: 'sc sc-' + x[0] }, storyIcon(x[0]), x[1])) : null);
     fill('hero-curve', i0 >= 0 ? dayCurve(wx, p, now) : null);
     if (di >= 0 && isNum(wx.d.tmax[di + 1])) chips.push(chip('Tomorrow ' + fT(wx.d.tmax[di + 1]) + ' / ' + fT(wx.d.tmin[di + 1])));
     if (S.aq && S.aq.cur && isNum(S.aq.cur.aqi) && S.aq.cur.aqi > 50) chips.push(chip('Air: ' + aqiCat(S.aq.cur.aqi).name.toLowerCase(), null, aqiCat(S.aq.cur.aqi).dot));
@@ -2495,7 +2646,7 @@ R.hero = function () {
   } else { fill('hero-story'); fill('hero-curve'); fill('hero-main', h('div', { class: 'hero-cond' }, h('span', null, 'Loading weather…'))); }
   fill('hero-chips', chips);
   const st = S.status.wx || {};
-  fill('stamp', S.blocked ? 'Weather is not available in this copy' : S.wx ? 'Updated ' + fAgo(S.wx.fetched) + (S.wx.source === 'nws' ? ' from the National Weather Service' : '') + (st.state === 'loading' ? ', refreshing…' : st.state === 'error' ? '. Refresh failed, may be stale' : '') : (st.state === 'error' ? 'Weather could not load' : st.state === 'loading' ? 'Loading weather…' : ''));
+  fill('stamp', S.blocked ? 'Weather is not available in this copy' : S.wx ? 'Updated ' + fAgo(S.wx.fetched) + (st.state === 'loading' ? ', refreshing…' : st.state === 'error' ? '. Refresh failed, may be stale' : '') : (st.state === 'error' ? 'Weather could not load' : st.state === 'loading' ? 'Loading weather…' : ''));
 };
 
 R.brief = function () {
@@ -2530,7 +2681,7 @@ R.hours = function () {
   const x = ix.map(i => H.t[i]);
   const cols = ix.map((i, k) => hourCol(H, i, k === 0 ? 'Now' : zparts(H.t[i], tz).h === 0 ? fDow(H.t[i], tz) : fHour(H.t[i], tz), k === 0 ? 'on' : ''));
   const gusts = ix.map(i => H.gust[i]), gm = maxOf(gusts);
-  let line = rainLine(wx, i0, now, tz) + '.';
+  let line = rainLine(wx, i0, now, tz, rainNow(S, now)) + '.';
   if (isNum(gm) && gm >= 40) line += ' Gusts to ' + fMph(gm) + ' mph around ' + fHour(x[gusts.indexOf(gm)], tz) + '.';
   const drawCharts = host => {
     const c1 = h('div'), c2 = h('div');
@@ -2691,7 +2842,13 @@ R.now = function () {
   a.push(T('Wind', isNum(mph) ? Math.round(mph) : '–', { i: 'wind', c: '#1f9e9a', unit: 'mph', side: true, g: dial(c.wdir), n: (isNum(gust) ? 'Gusts ' + Math.round(gust) + '. ' : '') + 'From the ' + compass(c.wdir) + '.' }));
   a.push(T('Humidity', fPct(c.rh), { i: 'drop', c: '#2fa7c9', g: bar2((c.rh || 0) / 100), n: isNum(dewF) ? 'Dew point ' + Math.round(dewF) + '°, ' + dewWord(dewF) + '.' : '' }));
   if (isNum(c.uv)) a.push(T('UV index', rnd(c.uv, 0), { i: 'uv', c: uvColor(c.uv), unit: uvWord(c.uv), g: pinScale(c.uv, 12, UV_SEGS, 'UV index ' + rnd(c.uv, 0) + ' of 11 and up'), n: c.uv >= 3 ? 'Sunscreen.' : 'No protection needed.' }));
-  if (hI >= 0) { const next = H.pp.slice(hI, hI + 12); b.push(T('Rain, next 12 hrs', isNum(H.pp[hI]) ? Math.round(H.pp[hI]) + '%' : '–', { i: 'umbrella', c: 'var(--rain)', g: h('div', { class: 'spark', role: 'img', 'aria-label': 'Chance of rain for each of the next 12 hours' }, next.map(v => h('i', { style: 'height:' + Math.max(4, isNum(v) ? v : 0) + '%' }))), n: rainLine(wx, hI, now, tz) + '.' })); }
+  if (hI >= 0) {
+    const next = H.pp.slice(hI, hI + 12), rn = rainNow(S, now), spark = h('div', { class: 'spark', role: 'img', 'aria-label': 'Chance of rain for each of the next 12 hours' }, next.map(v => h('i', { style: 'height:' + Math.max(4, isNum(v) ? v : 0) + '%' })));
+    if (rn && rn.wet) {
+      const rc = rainChange(wx, hI, true);
+      b.push(T('Rain now', rn.short, { i: 'umbrella', c: 'var(--rain)', g: spark, n: seenWhere(rn) + '. ' + (rn.startedMins != null ? 'Started in the last ' + rn.startedMins + ' min. ' : '') + (rc.unforecast ? 'Not in the forecast.' : rc.easesAt ? 'Eases about ' + whenShort(rc.easesAt, now, tz) + '.' : 'Through the next day.') }));
+    } else b.push(T('Rain, next 12 hrs', isNum(H.pp[hI]) ? Math.round(H.pp[hI]) + '%' : '–', { i: 'umbrella', c: 'var(--rain)', g: spark, n: rainLine(wx, hI, now, tz, rn) + '.' }));
+  }
   if (isNum(c.cloud)) b.push(T('Cloud cover', fPct(c.cloud), { i: 'cloud', c: '#7f8fa6', g: bar2(c.cloud / 100), n: c.isDay ? (c.cloud < 30 ? 'Warmer in sun than shade.' : c.cloud < 70 ? 'Sun in and out.' : 'Sun and shade feel the same.') : (c.cloud < 30 ? 'Clear nights cool fastest.' : 'Cloud holds the warmth in.') }));
   const pt = hI >= 3 ? pressureTrend(wx, hI) : null;
   if (isNum(c.pmsl)) b.push(T('Pressure', hpa2inhg(c.pmsl).toFixed(2), { i: 'gauge', c: '#8a7fd0', unit: 'inHg', side: true, g: pt ? trendSvg(pt.d >= 0.5 ? 1 : pt.d <= -0.5 ? -1 : 0) : null, n: pt ? pt.word + '. ' + (pt.d >= 0.5 ? 'Clearing.' : pt.d <= -0.5 ? 'Weather on the way.' : 'No change coming.') : '' }));
@@ -2899,8 +3056,10 @@ R.history = function () {
 function ordinal(n) { const s2 = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s2[(v - 20) % 10] || s2[v] || s2[0]); }
 
 R.foot = function () {
-  const names = { wx: 'Weather forecast (Open-Meteo)', aq: 'Air quality (Open-Meteo, CAMS model)', alerts: 'Alerts (National Weather Service)', nws: 'Written forecast and nearest station (National Weather Service)', afd: 'Forecaster discussion (National Weather Service)', cpc: '6 to 14 day outlook (NOAA Climate Prediction Center)', mtn: 'Mountain forecast (Open-Meteo)', hist: 'Daily history since 1991 (Open-Meteo, ERA5)' };
-  const items = Object.keys(names).map(k => { const st = S.status[k] || {}; if (st.state === 'ok' && ((k === 'wx' && S.wx && S.wx.source === 'nws') || (k === 'mtn' && S.mtn && S.mtn.source === 'nws'))) return h('li', null, h('i', { class: 'dot warn' }), h('span', null, names[k].replace(/ \(Open-Meteo\)/, '') + ': Open-Meteo did not answer, so this came from the National Weather Service ' + fAgo(st.at))); const cls = st.state === 'ok' ? 'good' : st.state === 'error' ? 'crit' : st.state === 'loading' ? 'warn' : ''; return h('li', null, h('i', { class: 'dot ' + cls }), h('span', null, names[k] + ': ' + (S.blocked ? 'not available in this copy' : st.state === 'ok' ? 'loaded ' + fAgo(st.at) : st.state === 'error' ? 'failed. ' + st.msg : st.state === 'loading' ? 'loading' : st.state === 'skip' ? 'not used for this place' : 'waiting'))); });
+  const us = isUS(place());
+  const names = { wx: us ? 'Weather forecast (National Weather Service, with UV and pressure from Open-Meteo)' : 'Weather forecast (Open-Meteo)', radar: 'Rain right now (NEXRAD radar, through Iowa State University’s mesonet)', aq: 'Air quality (Open-Meteo, CAMS model)', alerts: 'Alerts (National Weather Service)', nws: 'Written forecast and nearest station (National Weather Service)', afd: 'Forecaster discussion (National Weather Service)', cpc: '6 to 14 day outlook (NOAA Climate Prediction Center)', mtn: 'Mountain forecast (Open-Meteo)', hist: 'Daily history since 1991 (Open-Meteo, ERA5)' };
+  const fellBack = { 'nws-only': 'Weather forecast: Open-Meteo did not answer, so UV and pressure are missing. The rest came from the National Weather Service ', om: 'Weather forecast: the National Weather Service did not answer, so this is Open-Meteo’s forecast, loaded ' };
+  const items = Object.keys(names).map(k => { const st = S.status[k] || {}; if (st.state === 'ok' && k === 'wx' && S.wx && fellBack[S.wx.source] && us) return h('li', null, h('i', { class: 'dot warn' }), h('span', null, fellBack[S.wx.source] + fAgo(st.at))); if (st.state === 'ok' && k === 'mtn' && S.mtn && S.mtn.source === 'nws') return h('li', null, h('i', { class: 'dot warn' }), h('span', null, 'Mountain forecast: Open-Meteo did not answer, so this came from the National Weather Service ' + fAgo(st.at))); const cls = st.state === 'ok' ? 'good' : st.state === 'error' ? 'crit' : st.state === 'loading' ? 'warn' : ''; return h('li', null, h('i', { class: 'dot ' + cls }), h('span', null, names[k] + ': ' + (S.blocked ? 'not available in this copy' : st.state === 'ok' ? 'loaded ' + fAgo(st.at) : st.state === 'error' ? 'failed. ' + st.msg : st.state === 'loading' ? 'loading' : st.state === 'skip' ? 'not used for this place' : 'waiting'))); });
   fill('foot-status', items);
 };
 R.welcome = function () {
@@ -3110,7 +3269,7 @@ R.stars = function () {
 
 // ---- 07-app.js ----
 // ---------- state and wiring ----------
-const S = { places: [], placeId: null, settings: null, now: Date.now(), status: {}, blocked: false, wx: null, aq: null, alerts: null, nwsFc: null, obs: null, afd: null, cpc: null, mtn: null, hist: null, moon: null, ms: null, lastLoad: 0 };
+const S = { places: [], placeId: null, settings: null, now: Date.now(), status: {}, blocked: false, wx: null, aq: null, alerts: null, nwsFc: null, obs: null, radar: null, afd: null, cpc: null, mtn: null, hist: null, moon: null, ms: null, lastLoad: 0 };
 function place() { return S.places.find(p => p.id === S.placeId) || S.places[0]; }
 function setStatus(key, state, msg) { S.status[key] = { state, msg: msg || '', at: Date.now() }; renderOne('foot'); if (key === 'wx') renderOne('hero'); }
 let loadSeq = 0;
@@ -3157,9 +3316,16 @@ async function loadNws(p, seq, force) {
   if (seq !== loadSeq) return;
   Promise.all([
     fetchNwsForecast(pt).then(v => { if (seq === loadSeq) { S.nwsFc = v; draw(['week']); } }),
-    fetchObs(pt, p).then(v => { if (seq === loadSeq) { S.obs = v; draw(['now']); } }).catch(() => { /* a missing station reading is not worth an error */ })
+    fetchObs(pt, p).then(v => { if (seq === loadSeq) { S.obs = v; draw(['hero', 'now']); } }).catch(() => { /* a missing station reading is not worth an error */ })
   ]).then(() => setStatus('nws', 'ok'), e => setStatus('nws', 'error', e.message));
   if (pt.office) run('afd', () => fetchAfd(pt.office)).then(v => { if (v && seq === loadSeq) { S.afd = v; draw(['week']); } });
+}
+// radar over the place, every five minutes while the app is open
+async function loadRadar(p, seq, force) {
+  if (!isUS(p)) { setStatus('radar', 'skip'); return; }
+  if (!force && S.radar && Date.now() - S.radar.fetched < 4 * 60000) return;
+  const v = await run('radar', () => fetchRadar(p, store.get('st:' + p.id)));
+  if (v && seq === loadSeq) { S.radar = v; draw(['hero', 'now']); }
 }
 async function loadAll(force) {
   if (S.blocked) return;
@@ -3180,13 +3346,14 @@ async function loadAll(force) {
     draw(['air', 'now', 'brief']); if (S.plan) renderPlanOut();
   });
   loadNws(p, seq, force);
+  loadRadar(p, seq, force);
   loadMountains(force);
   setTimeout(() => { if (seq === loadSeq) loadHistory(); }, 1200);
 }
 
 function startPlace() {
   const p = place();
-  S.wx = S.aq = S.alerts = S.nwsFc = S.obs = S.afd = S.cpc = S.hist = null; S.plan = null; S.histFor = null; S.status = {};
+  S.wx = S.aq = S.alerts = S.nwsFc = S.obs = S.radar = S.afd = S.cpc = S.hist = null; S.plan = null; S.histFor = null; S.status = {};
   S.now = Date.now();
   const cw = store.get('wx:' + p.id), ca = store.get('aq:' + p.id);
   if (cw && Date.now() - cw.fetched < 48 * HOUR) S.wx = cw;
@@ -3248,6 +3415,7 @@ function tick(force) {
   if (S.astroDay !== dayKey(S.now, p.tz)) { computeAstro(); renderAll(); }
   else renderOne('hero');
   if (!S.blocked && (force ? Date.now() - S.lastLoad > 5 * 60000 : Date.now() - S.lastLoad > 10 * 60000)) { renderAll(); loadAll(false); }
+  else if (!S.blocked && !document.hidden && S.radar && Date.now() - S.radar.fetched > 5 * 60000) loadRadar(p, loadSeq, false);
 }
 function init() {
   S.places = store.get('places', null) || DEFAULT_PLACES.map(p => Object.assign({}, p));
