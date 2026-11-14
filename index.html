@@ -1662,6 +1662,33 @@ async function fetchCpc(stateName) {
   return { fetched: Date.now(), issued: pr.issued, state: stateName, calls: parseCpc(pr.text, stateName) };
 }
 
+// ---------- the ozone layer overhead ----------
+// NASA POWER: total column ozone (Dobson units) over the place from NASA's satellite-fed atmosphere model, a few days behind,
+// and its 2001 to 2025 average for each month, so a reading can be set against normal.
+const MONTHS3 = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+async function fetchOzone(p) {
+  const base = 'https://power.larc.nasa.gov/api/temporal/', q = '&community=RE&longitude=' + rnd(p.lon, 3) + '&latitude=' + rnd(p.lat, 3) + '&format=JSON';
+  const ymd = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, '');
+  let norm = store.get('o3n:' + p.id);
+  const fresh = norm && Date.now() - norm.at < 180 * DAY && norm.m && norm.m.length === 12;
+  const [d, c] = await Promise.all([
+    getJSON(base + 'daily/point?parameters=TO3&start=' + ymd(Date.now() - 14 * DAY) + '&end=' + ymd(Date.now()) + q, 15000),
+    fresh ? null : getJSON(base + 'climatology/point?parameters=TO3' + q, 15000)]);
+  if (c) { const v = ((c.properties || {}).parameter || {}).TO3 || {}; norm = { at: Date.now(), m: MONTHS3.map(k => v[k]) }; if (norm.m.every(x => isNum(x) && x > 0)) store.set('o3n:' + p.id, norm); else throw new Error('No ozone averages for this place'); }
+  const ser = ((d.properties || {}).parameter || {}).TO3 || {};
+  const days = Object.keys(ser).sort().filter(k => isNum(ser[k]) && ser[k] > 0);
+  if (!days.length) throw new Error('No recent ozone reading');
+  const k = days[days.length - 1];
+  return { fetched: Date.now(), du: ser[k], y: +k.slice(0, 4), m: +k.slice(4, 6), d: +k.slice(6, 8), normals: norm.m };
+}
+// the monthly averages read as a smooth year: each month's value sits mid-month, days in between are blended
+function ozoneNormal(normals, doy) {
+  const f = (doy - 15.2) / 30.44, k0 = Math.floor(f), w = f - k0, at = k => normals[((k % 12) + 12) % 12];
+  const p0 = at(k0 - 1), p1 = at(k0), p2 = at(k0 + 1), p3 = at(k0 + 2);
+  // a smooth curve through the twelve months (Catmull-Rom) rather than straight lines between them
+  return 0.5 * (2 * p1 + (p2 - p0) * w + (2 * p0 - 5 * p1 + 4 * p2 - p3) * w * w + (3 * p1 - p0 - 3 * p2 + p3) * w * w * w);
+}
+
 // ---------- radar: what is falling right now, read off the national radar picture ----------
 // The NEXRAD mosaic served by Iowa State University's mesonet. Each pixel's colour stands for a reflectivity (dBZ), so reading
 // the few pixels over the place answers "is it raining here" from a measurement, every five minutes, about a kilometre across.
@@ -2507,6 +2534,17 @@ function yearCurve(vals, idx, color) {
     s('path', { d: 'M' + pts.join('L'), fill: 'none', style: 'stroke:' + color, 'stroke-width': 2, 'stroke-linecap': 'round' }),
     isNum(vals[idx]) ? s('circle', { cx: rnd(X(idx), 1), cy: rnd(Y(vals[idx]), 1), r: 4.5, style: 'fill:var(--ink);stroke:var(--card);stroke-width:2' }) : null);
 }
+// the ozone layer's normal year as a line, and the latest reading as a dot above or below it
+function ozoneCurve(normals, doy, du, color) {
+  const W = 300, H = 58, n = 365, vals = [];
+  for (let i = 1; i <= n; i += 2) vals.push([i, ozoneNormal(normals, i)]);
+  const all = vals.map(v => v[1]).concat([du]), lo = Math.min.apply(null, all) - 6, hi = Math.max.apply(null, all) + 6;
+  const X = d => 5 + (d - 1) / (n - 1) * (W - 10), Y = v => 6 + (hi - v) / (hi - lo) * (H - 12);
+  return s('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'arc', role: 'img', 'aria-label': 'Normal ozone through the year, with the latest reading' },
+    s('path', { d: 'M' + vals.map(v => rnd(X(v[0]), 1) + ' ' + rnd(Y(v[1]), 1)).join('L'), fill: 'none', style: 'stroke:' + color, 'stroke-width': 2.5, 'stroke-linecap': 'round' }),
+    s('line', { x1: rnd(X(doy), 1), x2: rnd(X(doy), 1), y1: rnd(Y(ozoneNormal(normals, doy)), 1), y2: rnd(Y(du), 1), style: 'stroke:var(--ink-2)', 'stroke-width': 1.5, 'stroke-dasharray': '2 3' }),
+    s('circle', { cx: rnd(X(doy), 1), cy: rnd(Y(du), 1), r: 6, style: 'fill:var(--ink);stroke:var(--card);stroke-width:2.5' }));
+}
 function trendSvg(dir) {
   const d = dir > 0 ? 'M5 17L19 7M19 7h-7M19 7v7' : dir < 0 ? 'M5 7l14 10M19 17h-7M19 17v-7' : 'M4 12h16M20 12l-5-4M20 12l-5 4';
   return s('svg', { viewBox: '0 0 24 24', width: 34, height: 34, 'aria-hidden': 'true' }, s('path', { d, fill: 'none', style: 'stroke:var(--ink)', 'stroke-width': 2.4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
@@ -2899,6 +2937,15 @@ R.light = function () {
       t.push(T(shortest ? 'Shortest day' : 'Longest day', String(Math.max(0, daysBetween(now, sol.t, tz))), { i: 'cal', c: shortest ? '#5b6fd6' : 'var(--sun)', unit: 'days', g: h('div', null, bar2(done), h('div', { class: 'pscale-lab' }, h('span', null, shortest ? 'Longest day' : 'Shortest day'), h('span', null, fMD(sol.t, tz)))), n: fDurLoose(Math.abs(sd.len - s2.len)) + ' still to ' + (shortest ? 'lose.' : 'gain.') }));
     }
   } else t.push(T('Sun', '–', { i: 'sunrise', wide: true, n: 'The sun does not rise and set in the usual way here today.' }));
+  // the ozone layer overhead, set against normal for the date it was measured
+  const o3 = S.o3;
+  if (o3 && isNum(o3.du) && o3.normals) {
+    const odoy = dayOfYear(o3.y, o3.m, o3.d), norm = ozoneNormal(o3.normals, odoy), pct = (o3.du - norm) / norm * 100, when = fMD(zonedEpoch(o3.y, o3.m, o3.d, 12, 0, tz), tz);
+    const near = Math.abs(pct) < 5;
+    t.push(T('Ozone layer', near ? 'Normal' : Math.abs(Math.round(pct)) + '%', { i: 'uv', c: '#3d8fd6', wide: true, unit: near ? 'for this time of year' : pct < 0 ? 'thinner than normal' : 'thicker than normal',
+      g: h('div', null, ozoneCurve(o3.normals, odoy, o3.du, '#3d8fd6'), h('div', { class: 'pscale-lab' }, h('span', null, 'Jan'), h('span', null, 'Thickest in spring, thinnest in fall'), h('span', null, 'Dec'))),
+      n: Math.round(o3.du) + ' Dobson units on ' + when + ', the latest reading. Normal is ' + Math.round(norm) + '. ' + (pct < -5 ? 'Thinner lets more of the sun’s UV through.' : pct > 5 ? 'Thicker blocks more of the sun’s UV.' : 'It blocks most of the sun’s UV.') }));
+  }
   const mo = S.moon;
   if (mo) m.push(T('Moon', Math.round(mo.frac * 100) + '%', { i: 'moon', c: '#8a7fd0', side: true, g: moonSvg(mo.frac, mo.waxing, 56), n: mo.name + '.' + (mo.nextFull ? ' Full ' + fMD(mo.nextFull.t, tz) + '.' : '') }));
   const sea = seasonInfo(now, p.lat);
@@ -3057,7 +3104,7 @@ function ordinal(n) { const s2 = ['th', 'st', 'nd', 'rd'], v = n % 100; return n
 
 R.foot = function () {
   const us = isUS(place());
-  const names = { wx: us ? 'Weather forecast (National Weather Service, with UV and pressure from Open-Meteo)' : 'Weather forecast (Open-Meteo)', radar: 'Rain right now (NEXRAD radar, through Iowa State University’s mesonet)', aq: 'Air quality (Open-Meteo, CAMS model)', alerts: 'Alerts (National Weather Service)', nws: 'Written forecast and nearest station (National Weather Service)', afd: 'Forecaster discussion (National Weather Service)', cpc: '6 to 14 day outlook (NOAA Climate Prediction Center)', mtn: 'Mountain forecast (Open-Meteo)', hist: 'Daily history since 1991 (Open-Meteo, ERA5)' };
+  const names = { wx: us ? 'Weather forecast (National Weather Service, with UV and pressure from Open-Meteo)' : 'Weather forecast (Open-Meteo)', radar: 'Rain right now (NEXRAD radar, through Iowa State University’s mesonet)', o3: 'Ozone layer (NASA POWER, satellite data a few days behind)', aq: 'Air quality (Open-Meteo, CAMS model)', alerts: 'Alerts (National Weather Service)', nws: 'Written forecast and nearest station (National Weather Service)', afd: 'Forecaster discussion (National Weather Service)', cpc: '6 to 14 day outlook (NOAA Climate Prediction Center)', mtn: 'Mountain forecast (Open-Meteo)', hist: 'Daily history since 1991 (Open-Meteo, ERA5)' };
   const fellBack = { 'nws-only': 'Weather forecast: Open-Meteo did not answer, so UV and pressure are missing. The rest came from the National Weather Service ', om: 'Weather forecast: the National Weather Service did not answer, so this is Open-Meteo’s forecast, loaded ' };
   const items = Object.keys(names).map(k => { const st = S.status[k] || {}; if (st.state === 'ok' && k === 'wx' && S.wx && fellBack[S.wx.source] && us) return h('li', null, h('i', { class: 'dot warn' }), h('span', null, fellBack[S.wx.source] + fAgo(st.at))); if (st.state === 'ok' && k === 'mtn' && S.mtn && S.mtn.source === 'nws') return h('li', null, h('i', { class: 'dot warn' }), h('span', null, 'Mountain forecast: Open-Meteo did not answer, so this came from the National Weather Service ' + fAgo(st.at))); const cls = st.state === 'ok' ? 'good' : st.state === 'error' ? 'crit' : st.state === 'loading' ? 'warn' : ''; return h('li', null, h('i', { class: 'dot ' + cls }), h('span', null, names[k] + ': ' + (S.blocked ? 'not available in this copy' : st.state === 'ok' ? 'loaded ' + fAgo(st.at) : st.state === 'error' ? 'failed. ' + st.msg : st.state === 'loading' ? 'loading' : st.state === 'skip' ? 'not used for this place' : 'waiting'))); });
   fill('foot-status', items);
@@ -3269,7 +3316,7 @@ R.stars = function () {
 
 // ---- 07-app.js ----
 // ---------- state and wiring ----------
-const S = { places: [], placeId: null, settings: null, now: Date.now(), status: {}, blocked: false, wx: null, aq: null, alerts: null, nwsFc: null, obs: null, radar: null, afd: null, cpc: null, mtn: null, hist: null, moon: null, ms: null, lastLoad: 0 };
+const S = { places: [], placeId: null, settings: null, now: Date.now(), status: {}, blocked: false, wx: null, aq: null, alerts: null, nwsFc: null, obs: null, radar: null, o3: null, afd: null, cpc: null, mtn: null, hist: null, moon: null, ms: null, lastLoad: 0 };
 function place() { return S.places.find(p => p.id === S.placeId) || S.places[0]; }
 function setStatus(key, state, msg) { S.status[key] = { state, msg: msg || '', at: Date.now() }; renderOne('foot'); if (key === 'wx') renderOne('hero'); }
 let loadSeq = 0;
@@ -3345,6 +3392,11 @@ async function loadAll(force) {
     if (v) { S.aq = v; store.set('aq:' + p.id, v); }
     draw(['air', 'now', 'brief']); if (S.plan) renderPlanOut();
   });
+  if (!fresh(S.o3, 6 * HOUR)) run('o3', () => fetchOzone(p)).then(v => {
+    if (seq !== loadSeq) return;
+    if (v) { S.o3 = v; store.set('o3:' + p.id, v); }
+    draw(['light']);
+  });
   loadNws(p, seq, force);
   loadRadar(p, seq, force);
   loadMountains(force);
@@ -3353,11 +3405,13 @@ async function loadAll(force) {
 
 function startPlace() {
   const p = place();
-  S.wx = S.aq = S.alerts = S.nwsFc = S.obs = S.radar = S.afd = S.cpc = S.hist = null; S.plan = null; S.histFor = null; S.status = {};
+  S.wx = S.aq = S.alerts = S.nwsFc = S.obs = S.radar = S.o3 = S.afd = S.cpc = S.hist = null; S.plan = null; S.histFor = null; S.status = {};
   S.now = Date.now();
   const cw = store.get('wx:' + p.id), ca = store.get('aq:' + p.id);
   if (cw && Date.now() - cw.fetched < 48 * HOUR) S.wx = cw;
   if (ca && Date.now() - ca.fetched < 12 * HOUR) S.aq = ca;
+  const co = store.get('o3:' + p.id);
+  if (co && Date.now() - co.fetched < 3 * DAY) S.o3 = co;
   computeAstro();
   renderAll();
   loadAll(true);
@@ -3371,7 +3425,7 @@ function addPlace(r) {
 function removePlace(id) {
   if (S.places.length < 2) return;
   S.places = S.places.filter(p => p.id !== id); savePlaces();
-  ['wx:', 'aq:', 'pt:', 'pg:', 'st:', 'hb:', 'hc:'].forEach(k => store.del(k + id));
+  ['wx:', 'aq:', 'o3:', 'o3n:', 'pt:', 'pg:', 'st:', 'hb:', 'hc:'].forEach(k => store.del(k + id));
   if (S.placeId === id) setPlace(S.places[0].id);
 }
 
@@ -3404,7 +3458,7 @@ function useHere() {
   navigator.geolocation.getCurrentPosition(pos => {
     const r = { id: 'here', name: 'Current location', admin1: '', country: '', lat: pos.coords.latitude, lon: pos.coords.longitude, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' };
     S.places = S.places.filter(p => p.id !== 'here'); S.places.push(r); savePlaces();
-    ['wx:', 'aq:', 'pt:', 'pg:', 'st:', 'hb:', 'hc:'].forEach(k => store.del(k + 'here'));
+    ['wx:', 'aq:', 'o3:', 'o3n:', 'pt:', 'pg:', 'st:', 'hb:', 'hc:'].forEach(k => store.del(k + 'here'));
     closeSheet(); setPlace('here');
   }, () => renderSheet(null, 'Location was not shared. Search for the town instead.'), { timeout: 12000, maximumAge: 600000 });
 }
